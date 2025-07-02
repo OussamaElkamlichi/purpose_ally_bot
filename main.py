@@ -1,11 +1,10 @@
 from flask import Flask, request
 from telegram import Update, Bot
 from telegram.ext import Dispatcher, CommandHandler
-import os
 
 app = Flask(__name__)
 
-TOKEN = "7858277817:AAGt_RDeo8KcoIpu1ZOXZ8Lm2T7S1aQ9ca0"
+TOKEN = "8147668562:AAGEAgFhF2ghuRXYp3q4-AtPLoHhsYfQ2Sc"
 bot = Bot(token=TOKEN)
 dispatcher = Dispatcher(bot=bot, update_queue=None, workers=0, use_context=True)
 
@@ -26,7 +25,4 @@ def webhook():
 # ✅ Simple check route
 @app.route("/", methods=["GET"])
 def index():
-    return "Bot is alive", 200
-
-if __name__ == "__main__":
-    app.run(debug=True)
+    return "Nigga you good?", 200
