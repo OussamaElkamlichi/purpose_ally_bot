@@ -1,0 +1,55 @@
+from sqlalchemy import Column, Integer, String, DateTime, create_engine, inspect, BigInteger
+from sqlalchemy.orm import declarative_base
+from datetime import datetime
+import json
+import os
+
+Base = declarative_base()
+
+DB_USER = 'purposeally'
+DB_PASS = 'alhamdulillah'
+DB_NAME = 'purposeally$default'
+
+DATABASE_URL = 'mysql+pymysql://purposeally:alhamdulillah@purposeally.mysql.pythonanywhere-services.com/purposeally$default'
+engine = create_engine(DATABASE_URL,
+    pool_pre_ping=True,
+    pool_recycle=280,
+    pool_size=10,
+    max_overflow=5
+)
+
+base_dir = os.path.dirname(__file__)
+json_path = os.path.join(base_dir, 'ranks.json')
+
+with open(json_path, encoding='utf-8') as f:
+    ranks = json.load(f)
+
+default_rank = next(iter(ranks))
+
+class User(Base):
+    __tablename__ = 'users'
+    id = Column(Integer, primary_key=True)
+    telegram_id = Column(BigInteger, unique=True, nullable=False)
+    name = Column(String(100))
+    rank = Column(String(100), default=default_rank)
+    prod_hours = Column(Integer, default=0)
+    today_prod_hours = Column(Integer, default=0)
+    highest_daily_prod = Column(Integer, default=0)
+    challenges = Column(Integer, default=0)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+def create_tables():
+    Base.metadata.create_all(engine)
+    print("✅ Tables created.")
+
+def show_tables():
+    inspector = inspect(engine)
+    tables = inspector.get_table_names()
+    print("📋 Tables in your database:")
+    for table in tables:
+        print(f" - {table}")
+    return tables
+
+# This allows you to run `python models.py` to create tables
+if __name__ == '__main__':
+    create_tables()
