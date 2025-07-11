@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, create_engine, inspect, BigInteger
+from sqlalchemy import Column, Integer, String, DateTime, create_engine, inspect, BigInteger, ForeignKey, Text, func
 from sqlalchemy.orm import declarative_base
 from datetime import datetime
 import json
@@ -37,6 +37,37 @@ class User(Base):
     highest_daily_prod = Column(Integer, default=0)
     challenges = Column(Integer, default=0)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+class Goal(Base):
+    __tablename__ = 'goals'
+
+    goal_id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(BigInteger, ForeignKey('users.username_id', ondelete='CASCADE'), nullable=False)
+
+    goal_title = Column(String(255), nullable=False)
+    goal_description = Column(Text, nullable=True)
+
+    status = Column(String(50), default='not_started')
+
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
+    target_date = Column(DateTime, nullable=True)
+
+
+
+class Subgoal(Base):
+    __tablename__ = 'subgoals'
+
+    subgoal_id = Column(Integer, primary_key=True, autoincrement=True)
+    goal_id = Column(Integer, ForeignKey('goals.goal_id', ondelete='CASCADE'), nullable=False)
+
+    subgoal_title = Column(String(255), nullable=False)
+    subgoal_description = Column(Text, nullable=True)
+
+    duration = Column(Integer, nullable=True)
+    status = Column(String(50), default='not_started')
+
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
+    target_date = Column(DateTime, nullable=True)
 
 def create_tables():
     Base.metadata.create_all(engine)

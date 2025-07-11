@@ -1,6 +1,8 @@
 from sqlalchemy.orm import sessionmaker
-from models import engine, User
+from sqlalchemy import func
+from models import engine, User, Goal, Subgoal
 from datetime import datetime
+from telegram import InlineKeyboardMarkup, InlineKeyboardButton
 
 Session = sessionmaker(bind=engine)
 
@@ -65,7 +67,6 @@ def get_user_stats_message(telegram_id):
         f"🗓️ *تاريخ الانضمام:* {user.created_at.strftime('%d/%m/%Y')}"
     )
 
-
 def add_session(telegram_id: int, duration_minutes: int):
     session = Session()
     try:
@@ -84,7 +85,6 @@ def add_session(telegram_id: int, duration_minutes: int):
     finally:
         session.close()
 
-
 def delete_session(telegram_id, duration):
     session = Session()
     try:
@@ -101,7 +101,6 @@ def delete_session(telegram_id, duration):
     except Exception as e:
         session.rollback()
         print(f"❌ Error subtracting prod_hours for user {telegram_id}: {e}")
-
 
 def update_user_rank(telegram_id: int, new_rank: str):
     session = Session()
@@ -130,6 +129,119 @@ def reset():
     finally:
         session.close()
 
+def user_check(user_id, name, rank, prod_hours: int = 0, today_prod_hours: int = 0,
+             highest_daily_prod: int = 0, challenges: int = 0):
+    session = Session()
+    user = session.query(User).filter_by(telegram_id=user_id).first()
+    if user:
+        # Récupérer les objectifs de l'utilisateur
+        goals = session.query(Goal).filter_by(user_id=user_id).all()
+        total_goals = len(goals)
+
+        if total_goals > 0:
+            # Nombre d'objectifs complétés
+            checked_goals = session.query(func.count(Goal.goal_id)).filter_by(
+                user_id=user_id, status='done'
+            ).scalar()
+
+            if checked_goals < total_goals:
+                result = {
+                    "message": f"<blockquote>🍃<b>{name}</b> ،مرحباً</blockquote>\n\n"
+                               f"لقد سجّلت معنا أهدافًا في السابق. ولديك أهداف مكتملة بمعدل {checked_goals}/{total_goals}\n"
+                               f"<blockquote><b>البداية الجديدة تحمو جميع المعلومات</b></blockquote>",
+                    "reply_markup": InlineKeyboardMarkup([
+                        [InlineKeyboardButton('أريد أن أتابع 💪', callback_data='indeed')],
+                        [InlineKeyboardButton('أريد بداية جديدة 🆕', callback_data='new_start')]
+                    ])
+                }
+                return 200, result
+
+            elif checked_goals == total_goals:
+                result = {
+                    "message": f"<blockquote>🍃<b>{name}</b> ،مرحباً</blockquote>\n\n"
+                               f"لقد سجّلت معنا أهدافًا في السابق. ولديك جميع الأهداف مكتملة بمعدل {checked_goals}/{total_goals}\n"
+                               f"<blockquote><b>البداية الجديدة تحمو جميع المعلومات</b></blockquote>",
+                    "reply_markup": InlineKeyboardMarkup([
+                        [InlineKeyboardButton('أريد بداية جديدة 🆕', callback_data='new_start')]
+                    ])
+                }
+                return 200, result
+        else:
+            # Aucun objectif enregistré
+            result = {
+                "message": f"<blockquote>🍃<b>{name}</b> ،مرحباً</blockquote>\n\n"
+                           "لقد سجّلت معنا أهدافًا في السابق. لكن دون أهداف",
+                "reply_markup": InlineKeyboardMarkup([
+                    [InlineKeyboardButton('أريد بداية جديدة', callback_data='new_start')]
+                ])
+            }
+            return 200, result
+    else:
+        # Nouvel utilisateur → insertion
+        new_user = User(
+            telegram_id=user_id,
+            name=name,
+            rank=rank,
+            prod_hours=prod_hours,
+            today_prod_hours=today_prod_hours,
+            highest_daily_prod=highest_daily_prod,
+            challenges=challenges,
+            created_at=datetime.utcnow()
+        )
+        session.add(new_user)
+        session.commit()
+        return 201, {"message": "done"}
+def goals_seeding(goals_list, user_id):
+    session = Session()
+    try:
+        for main_goal, sub_goals in goals_list.items():
+            # Insert main goal
+            goal_obj = Goal(
+                user_id=user_id,
+                goal_title=main_goal,
+                goal_description=None,
+                status="not_started",
+                target_date=None
+            )
+            session.add(goal_obj)
+            session.flush()  # To get goal_obj.id
+            # Insert each sub-goal
+            for sub_goal in sub_goals:
+                subgoal_obj = Subgoal(
+                    goal_id=goal_obj.id,
+                    subgoal_title=sub_goal,
+                    subgoal_description="None",
+                    duration="None",
+                    status="not_started",
+                    target_date="None"
+                )
+                session.add(subgoal_obj)
+        session.commit()
+        return "تم الإدخال"
+    except Exception as err:
+        session.rollback()
+        return f"Error: {err}"
+    finally:
+        session.close()
+
+def show_demo_db(user_id):
+    session = Session()
+    my_list = {}
+    try:
+        goals = session.query(Goal).filter_by(user_id=user_id).all()
+        for goal in goals:
+            # Fetch subgoals for the current main goal
+            subgoals = session.query(Subgoal).filter_by(goal_id=goal.goal_id).all()
+            subgoals_list = [
+                {"subgoal_title": subgoal.subgoal_title, "status": subgoal.status}
+                for subgoal in subgoals
+            ]
+            my_list[goal.goal_title] = subgoals_list
+        return my_list
+    except Exception as err:
+        return f"Error: {err}"
+    finally:
+        session.close()
 
 
 

@@ -1,15 +1,23 @@
-from telegram import Update, ChatAdministratorRights
+from telegram import Update, ChatAdministratorRights, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ChatMemberStatus
-import telegram
+import requests
 from telegram.ext import (
     Application,
     CommandHandler,
+    ConversationHandler,
     MessageHandler,
     ContextTypes,
+    CallbackQueryHandler,
     filters
 )
-from db_agent import add_user, get_user_by_telegram_id, get_user_stats_message, add_session, delete_session, get_user_prod_hours, update_user_rank
+from db_agent import add_user,user_check, get_user_by_telegram_id, get_user_stats_message, add_session, delete_session, get_user_prod_hours, update_user_rank, show_demo_db, edit_prep, updateGoal, cron_seed
 import asyncio, os, json
+from dotenv import load_dotenv
+from datetime import datetime
+from userGoals import UserGoals
+
+MAIN_GOAL, SUB_GOALS, EDIT_GOAL, SET_CRON, SET_CRON_TIME, SET_CRON_WEEKDAY, EDIT_CRON_TIME = range(7)
+
 
 base_dir = os.path.dirname(__file__)
 json_path = os.path.join(base_dir, 'ranks.json')
@@ -19,12 +27,11 @@ with open(json_path, encoding='utf-8') as f:
 
 default_rank = next(iter(ranks))
 
-BOT_TOKEN = "8147668562:AAGEAgFhF2ghuRXYp3q4-AtPLoHhsYfQ2Sc"
+BOT_TOKEN = os.getenv("BOT_TOKEN")
 
 application = Application.builder().token(BOT_TOKEN).build()
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    print(telegram.__version__)
+async def signup(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     telegram_id = user.id
     name = f"{user.first_name or ''} {user.last_name or ''}".strip() or "NoName"
@@ -72,7 +79,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             custom_title=default_rank
         )
         # await context.bot.send_message(chat_id=chat_id, text=welcome_message)
-
 
 async def handle_add_session(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
@@ -152,21 +158,367 @@ async def show_commands(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
     await update.message.reply_text(commands_text)
-# async def echo_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
-#     await update.message.reply_text("✅ I got your message!")
 
-# application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo_all))
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    telegram_id = user.id
+    name = f"{user.first_name or ''} {user.last_name or ''}".strip() or "NoName"
+    response_code, result = user_check(telegram_id, name, default_rank)
+    print(response_code, result)
+    if response_code == 200:
+        message = result.get("message", "An error occurred.")
+        reply_markup = result.get("reply_markup")
+        await update.message.reply_text(
+            text=message,
+            parse_mode='HTML',
+            reply_markup=reply_markup,
+        )
+    elif response_code == 201:
+        projectName = 'شريك الهمّة'
 
-application.add_handler(MessageHandler(filters.TEXT & filters.Regex(r'^#تسجيل'), start))
+        keyboard = [
+            [InlineKeyboardButton('🤖 تعريف شريك الهمة',
+                                  callback_data='identification')],
+            [InlineKeyboardButton('🤔 كيف أحدّد أهدافي',
+                                  callback_data='how_to_set_goals')],
+            [InlineKeyboardButton('📋 تسجيل أهدافي الخاصة',
+                                  callback_data='set_goals')],
+            # [InlineKeyboardButton('📚 الاطلاع على مسارات طلب العلم',
+            #                       callback_data='learning_tracks')],
+            # [InlineKeyboardButton('📥 الاتصال بنا', callback_data='contact_us')]
+        ]
+
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
+        await update.message.reply_text(
+            f'🌹السلام عليكم <b>{name}</b>\n'
+            '\n'
+            f'مرحباً بكم معنا في <b>{projectName}</b> رفيقكم في تحقيق أهدافكم وشريككم نحو مستوى وعي أرقى 🍃\n'
+            '\n'
+            ' اختر(ي) طلبك من القائمة أسفله واستعن بالله ولا تعجز✔️'
+            '\n',
+            parse_mode='HTML',
+            reply_markup=reply_markup,
+        )
+
+async def set_goals(update, context):
+
+    await update.callback_query.edit_message_text(
+        text='تم اختيار: <b>تسجيل أهدافي الخاصة📋</b>\n'
+             '\n'
+             'المرجو كتابة الهدف الرئيسي وإرساله، ومتابعة <b>الإرشادات</b>\n\n'
+             'تفضل(ي) 🍃🖋️',
+        parse_mode='HTML'
+    )
+
+    return MAIN_GOAL
+
+async def main_goal_req(update, context):
+    user_id = update.message.from_user.id
+    main_goal = update.message.text
+
+    # Store user data in context.user_data using user_id as a key
+    if user_id not in context.user_data:
+        context.user_data[user_id] = UserGoals(user_id)
+
+    # Store the main goal in the user's goal data
+    context.user_data[user_id].add_main_goal(user_id, main_goal)
+
+    await update.message.reply_text(
+        'تم تسجيل الهدف الرئيسي تحت عنوان:\n\n'
+        f"<blockquote>{main_goal}</blockquote>\n\n"
+        ' <b>تفضل(ي)</b> بتحديد الهدف الفرعي \n\n',
+        parse_mode='HTML'
+    )
+    # Store main goal in user_data for later reference
+    context.user_data[user_id].current_main_goal = main_goal
+
+    return SUB_GOALS
+
+async def sub_goal_req(update, context):
+    user_id = update.message.from_user.id
+    sub_goal = update.message.text
+
+    if user_id not in context.user_data:
+        await update.message.reply_text("يبدو أنك لم تحدد هدفًا رئيسيًا بعد. يرجى البدء بتحديد هدفك الرئيسي.")
+        return ConversationHandler.END
+
+    if sub_goal.lower() in ["انتهاء", "إنتهاء", "done"]:
+        goals_count = context.user_data[user_id].goals_count()
+        if len(goals_count.keys()) < 2:
+            # Inform user they need at least two goals
+            await update.message.reply_text(
+                'المرجو تحديد هدفين رئيسيين على الأقل.\n'
+                'اكتب(ي) "آخر" لإضافة هدف رئيسي جديد.'
+            )
+            return SUB_GOALS  # Stay in the same state and avoid sending the next message
+        else:
+            # Proceed to end the input if goals count is sufficient
+            goals_seed = context.user_data[user_id].launch(user_id)
+            keyboard = [[InlineKeyboardButton(
+                "كيف ستبدو أهدافك؟", callback_data="show_demo")]]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await update.message.reply_text(
+                '<blockquote>تم إنهاء الإدخال 🎉</blockquote>\n',
+                reply_markup=reply_markup,
+                parse_mode='HTML'
+            )
+            return ConversationHandler.END
+    elif sub_goal.lower() in ["آخر", "اخر"]:
+        # Handle adding a new main goal
+        await update.message.reply_text(
+            'تفضل(ي) بتحديد الهدف الرئيسي الآخر📝\n',
+            parse_mode='HTML'
+        )
+        return MAIN_GOAL
+
+    # Otherwise, add the sub-goal under the current main goal
+    main_goal = context.user_data[user_id].current_main_goal
+    context.user_data[user_id].add_sub_goal(user_id, main_goal, sub_goal)
+
+    # Only send the confirmation message when a sub-goal is added successfully
+    await update.message.reply_text(
+        'تم تسجيل الهدف الفرعي تحت عنوان:\n'
+        f"<blockquote>{sub_goal}</blockquote>\n"
+        'الأهداف الحالية:\n'
+        f"{context.user_data[user_id].get_goals_list()}\n\n"
+        'اكتب(ي) "انتهاء" لإنهاء الإدخال\n'
+        'أكتب(ي) "آخر" من أجل إضافة هدف رئيسي آخر',
+        parse_mode='HTML'
+    )
+
+    return SUB_GOALS
+
+async def show_demo(update, context):
+    user_id = update.callback_query.from_user.id
+    goals_list = show_demo_db(user_id)
+    main_goals = list(goals_list.keys())  # Collect all main goals as options
+
+    await context.bot.send_poll(
+        chat_id=update.effective_chat.id,
+        question="سجّل مهامك اليومية أثابك الله",
+        options=main_goals,
+        is_anonymous=False,
+        allows_multiple_answers=True,
+    )
+    keyboard = [
+        [InlineKeyboardButton("تعديل نص الأهداف", callback_data="edit_op")],
+        [InlineKeyboardButton("تحديد وقت إرسال المهمات",
+                              callback_data="set_cron_opt_call")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.callback_query.message.reply_text(
+        '<blockquote>استعن بالله ولا تعجز 🍃</blockquote>\n',
+        reply_markup=reply_markup,
+        parse_mode='HTML'
+    )
+
+async def edit_op(update, context):
+    user_id = update.callback_query.from_user.id
+    goals_list = edit_prep(user_id)
+
+    keyboard = [
+        [InlineKeyboardButton(
+            goal["text"], callback_data=f'{goal["type"]}***{goal["id"]}***{goal["text"]}')]
+        for goal in goals_list
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.callback_query.message.reply_text(
+        '<blockquote>اختر ما تريد تعديله</blockquote>\n',
+        reply_markup=reply_markup,
+        parse_mode='HTML'
+    )
+
+async def edit_goal_selection(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    
+    if "***" in query.data:
+        goal_type, goal_id, goal_text = query.data.split("***")
+        context.user_data['goal_type'] = goal_type
+        context.user_data['goal_id'] = goal_id
+        context.user_data['old_goal_text'] = goal_text
+
+        await query.edit_message_text(
+            f'<blockquote>تم اختيار 🎯</blockquote>\n{goal_text}\n'
+            '<b>أكتب نص الهدف الصحيح</b>',
+            parse_mode='HTML'
+        )
+        return EDIT_GOAL
+
+async def edit_goal(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    new_goal_text = update.message.text
+    goal_type = context.user_data.get('goal_type')
+    goal_id = context.user_data.get('goal_id')
+    old_goal_text = context.user_data.get('old_goal_text')
+
+    result = updateGoal(update.message.from_user.id,
+                        new_goal_text, goal_type, goal_id, old_goal_text)
+    await update.message.reply_text(result, parse_mode='HTML')
+
+    return ConversationHandler.END
+
+async def set_cron_opt(update, context):
+    keyboard = [
+        [InlineKeyboardButton("يوميًا", callback_data="cronOption:daily")],
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.callback_query.message.reply_text(
+        '<blockquote>تحديد وقت الإرسال  ⏲️</blockquote>\n',
+        reply_markup=reply_markup,
+        parse_mode='HTML'
+    )
+    return SET_CRON
+
+async def set_cron(update, context):
+    selected_option = update.callback_query.data.split(":")[1]
+    if selected_option == "daily":
+        await update.callback_query.message.reply_text(
+            text="<blockquote>أكتب الساعة والدقيقة التي تُريد</blockquote><b>مثال: 22:30</b>",
+            parse_mode="HTML"
+        )
+        cron_type = context.user_data['cron_settings'] = "daily"
+        return SET_CRON_TIME
+    elif selected_option == "weekly":
+        days_of_week = [
+            "الأحد",  # Sunday
+            "الإثنين",  # Monday
+            "الثلاثاء",  # Tuesday
+            "الأربعاء",  # Wednesday
+            "الخميس",  # Thursday
+            "الجمعة",  # Friday
+            "السبت"  # Saturday
+        ]
+        keyboard = [InlineKeyboardButton(
+            day, callback_data="weekday") for day in days_of_week]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await update.callback_query.message.reply_text(
+            "اختر اليوم الذي تريد تحديده للموعد الأسبوعي:",
+            reply_markup=reply_markup,
+            parse_mode='HTML'
+        )
+        return SET_CRON_WEEKDAY
+
+    elif selected_option == "custom":
+        await update.callback_query.message.reply_text("تم تحديد الإرسال حسب التخصيص.")
+    else:
+        await update.callback_query.message.reply_text("خيارات غير معروفة.")
+
+async def set_cron_time(update, context):
+    keyboard = [[  InlineKeyboardButton("تعديل", callback_data="edit_cron_launch")]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    time = update.message.text
+    user_id = update.message.from_user.id
+    cron_type = context.user_data.get('cron_settings')
+    res = cron_seed(user_id, cron_type, time)
+    if res == True:
+        await update.message.reply_text(
+        "<blockquote>تم تحديد وقت الإرسال ⏰</blockquote>\n"
+        f"<b>يومياً على الساعة:  {time}</b> ",
+        reply_markup=reply_markup,
+        parse_mode='HTML'
+        )
+    else:
+        await update.message.reply_text(
+        "<blockquote>لا يمكن تحديد التوقيت</blockquote>\n"
+        f"<b>خطأ داخلي</b> ",
+        reply_markup=reply_markup,
+        parse_mode='HTML'
+        )
+    return ConversationHandler.END
+
+async def edit_cron(update, context):
+    await update.callback_query.message.reply_text(
+    "المرجو كتابة التوقيت بدقّة (مثال: 06:00)"
+    )
+    return EDIT_CRON_TIME
+
+async def edit_cron_time(update, context):
+    user_id = update.message.from_user.id
+    new_cron_time = update.message.text
+    cron_type = context.user_data.get('cron_settings')
+    res = cron_seed(user_id, cron_type, new_cron_time)
+    if res == True:
+        cron_command(user_id,new_cron_time)
+        await update.message.reply_text(f"تم التحديث إلى:  {new_cron_time}")
+    else:
+        await update.message.reply_text("لا يمكن تحديث التوقيت في الوقت الراهن")
+
+    return ConversationHandler.END
+
+async def cron_command(user_id, time):
+    # PythonAnywhere API URL
+    api_url = "https://www.pythonanywhere.com/api/v0/user/ElkhamlichiOussa/scheduled_tasks/"
+    
+    # Your PythonAnywhere API key
+    api_key = "a41772ed5416f9eab35151f7ab443c797562ba6a"
+    
+    # Cron job details
+    command = f"python3 /home/ElkhamlichiOussama/purpose_ally/scheduled/tasks.py {user_id}"
+    # Schedule cron job to run daily at 8 AM
+
+    time_obj = datetime.strptime(time, "%H:%M")
+    
+    # Extract hour and minute
+    hour = time_obj.hour
+    minute = time_obj.minute
+    
+    # Convert to cron format: minute hour * * *
+    schedule = f"{minute} {hour} * * *"
+
+    print(schedule)    
+    # return cron_format
+    
+    # Create headers with API key for authentication
+    headers = {
+        "Authorization": f"Token {api_key}",
+        "Content-Type": "application/json"
+    }
+    
+    # Data to create a new cron job
+    data = {
+        "enabled": True,
+        "command": command,
+        "schedule": schedule,
+    }
+    
+    # Make the API request to create the cron job
+    response = requests.post(api_url, headers=headers, data=json.dumps(data))
+    
+    # Check if the cron job was created successfully
+    if response.status_code == 201:
+        print("Cron job created successfully.")
+    else:
+        print(f"Failed to create cron job: {response.status_code}")
+        print(response.text)
+
+
+convo_handler = ConversationHandler(
+        entry_points=[
+            CommandHandler("start", start),
+            CallbackQueryHandler(set_goals, pattern='set_goals'),
+            CallbackQueryHandler(edit_op, pattern='edit_op'),
+            CallbackQueryHandler(edit_goal_selection, pattern=".*\*\*\*.*"),
+            CallbackQueryHandler(set_cron_opt, pattern='set_cron_opt_call'),
+            CallbackQueryHandler(edit_cron, pattern='edit_cron_launch'),
+            CallbackQueryHandler(show_demo, pattern='show_demo'),
+        ],
+        states={
+            MAIN_GOAL: [MessageHandler(filters.TEXT & ~filters.COMMAND, main_goal_req)],
+            SUB_GOALS: [MessageHandler(filters.TEXT & ~filters.COMMAND, sub_goal_req)],
+            EDIT_GOAL: [MessageHandler(filters.TEXT & ~filters.COMMAND, edit_goal)],
+            SET_CRON: [CallbackQueryHandler(set_cron, pattern='cronOption:*')],
+            SET_CRON_TIME: [MessageHandler(filters.TEXT & ~filters.COMMAND, set_cron_time)],
+            EDIT_CRON_TIME: [MessageHandler(filters.TEXT & ~filters.COMMAND, edit_cron_time)],
+            SET_CRON_WEEKDAY: [CallbackQueryHandler(set_cron, pattern='weekday')],
+        }
+    )
+
+application.add_handler(convo_handler)
+application.add_handler(MessageHandler(filters.TEXT & filters.Regex(r'^#تسجيل'), signup))
 application.add_handler(MessageHandler(filters.TEXT & filters.Regex(r'^#إضافة_حصة'), handle_add_session))
 application.add_handler(MessageHandler(filters.TEXT & filters.Regex(r'^#استثماراتي'), handle_stats))
 application.add_handler(MessageHandler(filters.TEXT & filters.Regex(r'^#حذف_حصة'), handle_delete_session))
 application.add_handler(MessageHandler(filters.TEXT & filters.Regex(r'^#عرض_الخصائص'), show_commands))
 
-
-
-# import asyncio
-# async def init_app():
-#     await application.initialize()
-
-# asyncio.run(init_app())
