@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, create_engine, inspect, BigInteger, ForeignKey, Text, func
+from sqlalchemy import Column,text, TIMESTAMP, Integer, String, DateTime, create_engine, inspect, BigInteger, ForeignKey, Text, func
 from sqlalchemy.orm import declarative_base
 from datetime import datetime
 import json
@@ -68,6 +68,16 @@ class Subgoal(Base):
 
     created_at = Column(DateTime, nullable=False, server_default=func.now())
     target_date = Column(DateTime, nullable=True)
+
+class Scheduled(Base):
+    __tablename__ = "scheduled"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(BigInteger, ForeignKey("users.username_id", ondelete="CASCADE"), unique=True, index=True)
+    type = Column(String(50), nullable=True)
+    cron_pattern = Column(String(60), nullable=True)
+    created_at = Column(TIMESTAMP, nullable=False, server_default=text("CURRENT_TIMESTAMP"))
+    job_id = Column(String(255), nullable=True)
 
 def create_tables():
     Base.metadata.create_all(engine)

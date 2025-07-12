@@ -1,6 +1,6 @@
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import func
-from models import engine, User, Goal, Subgoal
+from models import engine, User, Goal, Subgoal, Scheduled
 from datetime import datetime
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton
 
@@ -243,16 +243,86 @@ def show_demo_db(user_id):
     finally:
         session.close()
 
+def edit_prep(user_id: int):
+    session = Session()
+    try:
+        main_list = []
 
+        # Récupérer les objectifs principaux
+        main_goals = session.query(Goal).filter(Goal.user_id == user_id).all()
 
+        for goal in main_goals:
+            main_list.append({
+                "type": "main",
+                "id": goal.goal_id,
+                "text": goal.goal_title
+            })
 
+            # Récupérer les sous-objectifs liés à ce goal
+            subgoals = session.query(Subgoal).filter(Subgoal.goal_id == goal.goal_id).all()
+            for sub in subgoals:
+                main_list.append({
+                    "type": "sub",
+                    "id": sub.subgoal_id,
+                    "text": sub.subgoal_title
+                })
 
+        return main_list
+    except Exception as e:
+        return f"Error: {e}"
+    finally:
+        session.close()
 
+def updateGoal(user_id, new_goal_text, goal_type, goal_id, old_goal_text=None):
+    session = Session()
+    try:
+        if goal_type == "main":
+            goal = session.query(Goal).filter(Goal.goal_id == goal_id, Goal.user_id == user_id).first()
+            if not goal:
+                return "الهدف الرئيسي غير موجود."
+            goal.goal_title = new_goal_text
 
+        elif goal_type == "sub":
+            subgoal = session.query(Subgoal).filter(Subgoal.subgoal_id == goal_id).join(Goal).filter(Goal.user_id == user_id).first()
+            if not subgoal:
+                return "الهدف الفرعي غير موجود."
+            subgoal.subgoal_title = new_goal_text
 
+        else:
+            return "نوع الهدف غير معروف."
 
+        session.commit()
+        return "تم تحديث الهدف بنجاح."
+    except Exception as e:
+        session.rollback()
+        return f"فشل التحديث: {str(e)}"
+    finally:
+        session.close()
 
+def cron_seed(user_id, type, params, jobId):
+    session = Session()
+    try:
+        scheduled = session.query(Scheduled).filter(Scheduled.user_id == user_id).first()
 
-
-
-
+        if scheduled:
+            scheduled.type = type
+            scheduled.cron_pattern = params
+            scheduled.job_id = jobId
+            session.commit()
+            return True  # ou: session.is_modified(scheduled)
+        else:
+            new_schedule = Scheduled(
+                user_id=user_id,
+                type=type,
+                cron_pattern=params,
+                job_id=jobId
+            )
+            session.add(new_schedule)
+            session.commit()
+            return True
+    except Exception as e:
+        print(f"Error: {e}")
+        session.rollback()
+        return False
+    finally:
+        session.close()
