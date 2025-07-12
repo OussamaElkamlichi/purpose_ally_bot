@@ -6,11 +6,11 @@ import os
 
 Base = declarative_base()
 
-DB_USER = 'purposeally'
+DB_USER = 'OussamaNoobie'
 DB_PASS = 'alhamdulillah'
 DB_NAME = 'purposeally$default'
 
-DATABASE_URL = 'mysql+pymysql://purposeally:alhamdulillah@purposeally.mysql.pythonanywhere-services.com/purposeally$default'
+DATABASE_URL = 'mysql+pymysql://OussamaNoobie:alhamdulillah@OussamaNoobie.mysql.pythonanywhere-services.com/purposeally$default'
 engine = create_engine(DATABASE_URL,
     pool_pre_ping=True,
     pool_recycle=280,
