@@ -26,7 +26,7 @@ with open(json_path, encoding='utf-8') as f:
     ranks = json.load(f)
 
 default_rank = next(iter(ranks))
-load_dotenv()
+load_dotenv('/home/OussamaNoobie/purpose_ally_bot/.env')
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 
 application = Application.builder().token(BOT_TOKEN).build()
@@ -254,15 +254,20 @@ async def sub_goal_req(update, context):
             return SUB_GOALS  # Stay in the same state and avoid sending the next message
         else:
             # Proceed to end the input if goals count is sufficient
-            goals_seed = context.user_data[user_id].launch(user_id)
-            keyboard = [[InlineKeyboardButton(
-                "كيف ستبدو أهدافك؟", callback_data="show_demo")]]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            await update.message.reply_text(
-                '<blockquote>تم إنهاء الإدخال 🎉</blockquote>\n',
-                reply_markup=reply_markup,
-                parse_mode='HTML'
-            )
+            stt_code, goals_seed = context.user_data[user_id].launch(user_id)
+            if stt_code == 200:
+                keyboard = [[InlineKeyboardButton(
+                    "كيف ستبدو أهدافك؟", callback_data="show_demo")]]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                await update.message.reply_text(
+                    '<blockquote>تم إنهاء الإدخال 🎉</blockquote>\n',
+                    reply_markup=reply_markup,
+                    parse_mode='HTML'
+                )
+            else:
+                await update.message.reply_text(
+                    f"❌ حدث خطأ أثناء تسجيل الأهداف: {goals_seed}"
+                )
             return ConversationHandler.END
     elif sub_goal.lower() in ["آخر", "اخر"]:
         # Handle adding a new main goal

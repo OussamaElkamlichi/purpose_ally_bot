@@ -33,7 +33,7 @@ class UserGoals:
         
     def launch(self, user_id):
         res = goals_seeding(self.goals, user_id)
-        return res
+        return 200, res
     
     def extra_launch(self, user_id):
         res = goals_seeding(self.extragoals, user_id)
