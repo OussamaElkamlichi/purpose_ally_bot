@@ -6,7 +6,7 @@ from db_agent import reset
 
 flask_app = Flask(__name__)
 
-@flask_app.route('/webhook', methods=['POST'])
+@flask_app.route('/webhook/', methods=['POST'])
 def webhook():
     try:
         data = request.get_json(force=True)

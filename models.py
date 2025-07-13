@@ -42,7 +42,7 @@ class Goal(Base):
     __tablename__ = 'goals'
 
     goal_id = Column(Integer, primary_key=True, autoincrement=True)
-    user_id = Column(BigInteger, ForeignKey('users.username_id', ondelete='CASCADE'), nullable=False)
+    user_id = Column(BigInteger, ForeignKey('users.telegram_id', ondelete='CASCADE'), nullable=False)
 
     goal_title = Column(String(255), nullable=False)
     goal_description = Column(Text, nullable=True)

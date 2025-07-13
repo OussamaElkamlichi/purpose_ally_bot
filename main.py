@@ -26,7 +26,7 @@ with open(json_path, encoding='utf-8') as f:
     ranks = json.load(f)
 
 default_rank = next(iter(ranks))
-
+load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 
 application = Application.builder().token(BOT_TOKEN).build()
@@ -493,6 +493,12 @@ async def cron_command(user_id, time):
         print(f"Failed to create cron job: {response.status_code}")
         print(response.text)
 
+async def cancel(update, context):
+    # Envoie un message à l'utilisateur pour lui confirmer l'annulation
+    update.message.reply_text("La conversation a été annulée. N'hésitez pas à me recontacter plus tard.")
+    
+    # Termine la conversation en renvoyant la constante ConversationHandler.END
+    return ConversationHandler.END
 
 convo_handler = ConversationHandler(
         entry_points=[
@@ -512,7 +518,8 @@ convo_handler = ConversationHandler(
             SET_CRON_TIME: [MessageHandler(filters.TEXT & ~filters.COMMAND, set_cron_time)],
             EDIT_CRON_TIME: [MessageHandler(filters.TEXT & ~filters.COMMAND, edit_cron_time)],
             SET_CRON_WEEKDAY: [CallbackQueryHandler(set_cron, pattern='weekday')],
-        }
+        },
+        fallbacks=[CommandHandler('cancel', cancel)]
     )
 
 application.add_handler(convo_handler)
