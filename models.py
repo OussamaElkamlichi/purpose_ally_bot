@@ -73,7 +73,7 @@ class Scheduled(Base):
     __tablename__ = "scheduled"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    user_id = Column(BigInteger, ForeignKey("users.username_id", ondelete="CASCADE"), unique=True, index=True)
+    user_id = Column(BigInteger, ForeignKey("users.telegram_id", ondelete="CASCADE"), unique=True, index=True)
     type = Column(String(50), nullable=True)
     cron_pattern = Column(String(60), nullable=True)
     created_at = Column(TIMESTAMP, nullable=False, server_default=text("CURRENT_TIMESTAMP"))
