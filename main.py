@@ -10,7 +10,7 @@ from telegram.ext import (
     CallbackQueryHandler,
     filters
 )
-from db_agent import add_user,user_check, get_user_by_telegram_id, get_user_stats_message, add_session, delete_session, get_user_prod_hours, update_user_rank, show_demo_db, edit_prep, updateGoal, cron_seed
+from db_agent import add_user, get_goals,user_check, get_user_by_telegram_id, get_user_stats_message, add_session, delete_session, get_user_prod_hours, update_user_rank, show_demo_db, edit_prep, updateGoal, cron_seed
 import asyncio, os, json
 from dotenv import load_dotenv
 from datetime import datetime
@@ -308,8 +308,8 @@ async def show_demo(update, context):
     )
     keyboard = [
         [InlineKeyboardButton("تعديل نص الأهداف", callback_data="edit_op")],
-        [InlineKeyboardButton("تحديد وقت إرسال المهمات",
-                              callback_data="set_cron_opt_call")]
+        # [InlineKeyboardButton("تحديد وقت إرسال المهمات",
+        #                       callback_data="set_cron_opt_call")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.callback_query.message.reply_text(
@@ -504,6 +504,63 @@ async def cancel(update, context):
     
     # Termine la conversation en renvoyant la constante ConversationHandler.END
     return ConversationHandler.END
+
+async def maingoal_achieved(update, context):
+    user_id = update.message.from_user.id
+    stt_code, res = await get_goals(user_id)  
+    # await update.message.reply_text(res)
+    if(len(res) == 0):
+        await context.bot.send_message(user_id,
+            "<blockquote>يبدو أنه ليس لديك أية أهداف</blockquote>\n\n",
+            parse_mode='HTML'
+        )
+    else:
+        message_text = "<b>أهدافك 🎯</b>\n\n"
+        keyboard = []
+        if stt_code == 200:
+            for main_goal, data in res.items():
+                if data['main_status'] != 'done':
+                    message_text += f"<b>الهدف الرئيسي:</b> {main_goal}\n"
+
+                    keyboard.append([InlineKeyboardButton(
+                        f"✅ تم إنجاز الهدف الرئيسي: {main_goal}",
+                        callback_data=f"done_main_{data['goal_id']}"
+                    )])
+                else:
+                    message_text += f"<b>الهدف الرئيسي:</b> {main_goal} ✅\n"
+
+                    keyboard.append([InlineKeyboardButton(
+                        f"✅ تم إنجاز الهدف الرئيسي: {main_goal}",
+                        callback_data=f"done_main_{data['goal_id']}"
+                    )])
+
+                for subgoal in data['subgoals']:
+                    if subgoal['status'] != 'done':
+                        message_text += f"    • <b>الهدف الفرعي:</b> {subgoal['subgoal_title']} \n"
+
+                        keyboard.append([InlineKeyboardButton(
+                            f"✅ تم إنجاز الهدف الفرعي: {subgoal['subgoal_title']}",
+                            callback_data=f"done_sub_{subgoal['subgoal_id']}"
+                        )])
+                    else:
+                        message_text += f"    • <b>الهدف الفرعي:</b> {subgoal['subgoal_title']} ✅\n"
+
+                        keyboard.append([InlineKeyboardButton(
+                            f"✅ تم إنجاز الهدف الفرعي: {subgoal['subgoal_title']}",
+                            callback_data=f"done_sub_{subgoal['subgoal_id']}"
+                        )])
+
+                message_text += "\n" 
+
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await update.message.reply_text(
+                message_text,
+                reply_markup=reply_markup,
+                parse_mode='HTML'
+            )
+        else:
+            print("X____x")
+
 
 convo_handler = ConversationHandler(
         entry_points=[

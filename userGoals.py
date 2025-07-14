@@ -1,4 +1,4 @@
-from db_agent import goals_seeding, cron_seed
+from db_agent import get_user_by_telegram_id, goals_seeding, cron_seed
 
 class UserGoals:
     def __init__(self, user_id):
@@ -32,7 +32,11 @@ class UserGoals:
         return "\n".join([f"{extra_main_goal}: {', '.join(extra_sub_goals)}" for extra_main_goal, extra_sub_goals in self.extragoals.items()])
         
     def launch(self, user_id):
+        user = get_user_by_telegram_id(user_id)
+        if not user:
+            return 401, "User not found"
         res = goals_seeding(self.goals, user_id)
+        print(res)
         return 200, res
     
     def extra_launch(self, user_id):

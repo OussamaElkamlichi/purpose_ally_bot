@@ -191,6 +191,7 @@ def user_check(user_id, name, rank, prod_hours: int = 0, today_prod_hours: int =
         session.add(new_user)
         session.commit()
         return 201, {"message": "done"}
+
 def goals_seeding(goals_list, user_id):
     session = Session()
     try:
@@ -324,5 +325,40 @@ def cron_seed(user_id, type, params, jobId):
         print(f"Error: {e}")
         session.rollback()
         return False
+    finally:
+        session.close()
+
+def get_goals(user_id: int):
+    session = Session()
+    try:
+        my_list = {}
+
+        # Récupérer les goals de l'utilisateur
+        goals = session.query(Goal).filter_by(user_id=user_id).all()
+
+        for goal in goals:
+            subgoals_data = []
+
+            # Récupérer les subgoals liés à ce goal
+            subgoals = session.query(Subgoal).filter_by(goal_id=goal.id).all()
+
+            for sub in subgoals:
+                subgoals_data.append({
+                    "subgoal_id": sub.id,
+                    "subgoal_title": sub.subgoal_title,
+                    "status": sub.status
+                })
+
+            my_list[goal.goal_title] = {
+                "goal_id": goal.id,
+                "main_status": goal.status,
+                "subgoals": subgoals_data
+            }
+
+        print(my_list)
+        return 200, my_list
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        return 500, str(e)
     finally:
         session.close()
