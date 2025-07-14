@@ -340,7 +340,7 @@ def get_goals(user_id: int):
             subgoals_data = []
 
             # Récupérer les subgoals liés à ce goal
-            subgoals = session.query(Subgoal).filter_by(goal_id=goal.id).all()
+            subgoals = session.query(Subgoal).filter_by(goal_id=goal.goal_id).all()
 
             for sub in subgoals:
                 subgoals_data.append({
@@ -350,7 +350,7 @@ def get_goals(user_id: int):
                 })
 
             my_list[goal.goal_title] = {
-                "goal_id": goal.id,
+                "goal_id": goal.goal_id,
                 "main_status": goal.status,
                 "subgoals": subgoals_data
             }
