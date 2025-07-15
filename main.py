@@ -561,16 +561,64 @@ async def maingoal_achieved(update, context):
         else:
             print("X____x")
 
+async def old_goals(update, context):
+    await update.callback_query.answer()
+    user_id = update.callback_query.from_user.id
+    goals_list = show_demo_db(user_id)
+    # main_goals = list(goals_list.keys())  # Collect all main goals as options
 
+    # await update.callback_query.message.reply_text(
+    #     '<blockquote>هكذا ستبدو أهدافك 🍃</blockquote>\n',
+    #     parse_mode='HTML'
+    # )
+    unformatted_list = edit_prep(user_id)
+    # goals_list = await show_demo_db_advanced(user_id)
+    # await context.bot.send_poll(
+    #     chat_id=update.effective_chat.id,
+    #     question="سجّل مهامك اليومية أثابك الله",
+    #     options=main_goals,
+    #     is_anonymous=False,
+    #     allows_multiple_answers=True,
+    # )
+
+    keyboard = [
+        [InlineKeyboardButton("تعديل/حذف نص الأهداف", callback_data="edit_op")],
+        [InlineKeyboardButton("تحديد وقت إرسال المهمات",
+                              callback_data="get_location_call")]
+    ]
+    formatted_text = ""
+    main_goal_indent = "🎯 " 
+    sub_goal_indent = "    • "
+
+    for item in unformatted_list:
+        if item["type"] == "main":
+            formatted_text += main_goal_indent + item['text'] + "\n"
+        elif item["type"] == "sub":
+            formatted_text += sub_goal_indent + item['text'] + "\n"
+    # status_code, cron_time, job_Id = get_cron_time(user_id)
+    # if status_code == 200:
+    #     time = cron_time
+    # else:
+    #     time = "لم يتحدد بعد"
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.callback_query.message.reply_text(
+        '<blockquote>تفاصيل الأهداف🍃</blockquote>\n'
+        f"\n{formatted_text}\n"
+        f"<b>الإرسال اليومي على الساعة:</b> 00:00 \n",
+        reply_markup=reply_markup,
+        parse_mode='HTML'
+    )
 convo_handler = ConversationHandler(
         entry_points=[
             CommandHandler("start", start),
+            CommandHandler("goal_achieved", maingoal_achieved),
             CallbackQueryHandler(set_goals, pattern='set_goals'),
             CallbackQueryHandler(edit_op, pattern='edit_op'),
             CallbackQueryHandler(edit_goal_selection, pattern=".*\*\*\*.*"),
             CallbackQueryHandler(set_cron_opt, pattern='set_cron_opt_call'),
             CallbackQueryHandler(edit_cron, pattern='edit_cron_launch'),
             CallbackQueryHandler(show_demo, pattern='show_demo'),
+            CallbackQueryHandler(old_goals, pattern='indeed'),
         ],
         states={
             MAIN_GOAL: [MessageHandler(filters.TEXT & ~filters.COMMAND, main_goal_req)],
