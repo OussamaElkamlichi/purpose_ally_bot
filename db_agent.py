@@ -72,7 +72,7 @@ def add_session(telegram_id: int, duration_minutes: int):
     try:
         user = session.query(User).filter_by(telegram_id=telegram_id).first()
         if user is None:
-            return 401, "يبدو أنك غير مسجل، الرجاء التسجيل بالبوت أولا عبر تشغيل الأمر #تسجيل"
+            return 401, "يبدو أنك غير مسجل، الرجاء التسجيل في البوت أولًا عبر كتابة #تسجيل"
 
         user.prod_hours = (user.prod_hours or 0) + duration_minutes
         user.today_prod_hours = (user.today_prod_hours or 0) + duration_minutes  # fix here
@@ -344,7 +344,7 @@ def get_goals(user_id: int):
 
             for sub in subgoals:
                 subgoals_data.append({
-                    "subgoal_id": sub.id,
+                    "subgoal_id": sub.subgoal_id,
                     "subgoal_title": sub.subgoal_title,
                     "status": sub.status
                 })
