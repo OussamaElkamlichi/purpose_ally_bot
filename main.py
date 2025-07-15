@@ -18,7 +18,6 @@ from userGoals import UserGoals
 
 MAIN_GOAL, SUB_GOALS, EDIT_GOAL, SET_CRON, SET_CRON_TIME, SET_CRON_WEEKDAY, EDIT_CRON_TIME, EXTRA_MAIN_GOALS, EXTRA_SUB_GOALS = range(9)
 
-
 base_dir = os.path.dirname(__file__)
 json_path = os.path.join(base_dir, 'ranks.json')
 
@@ -37,7 +36,7 @@ commands = [
     BotCommand("goal_achieved", 'أنجزت هدف؟'),
 ]
 
-async def set_command_menu():
+async def set_command_menu(update, context):
     await application.bot.set_my_commands(commands)
 
 async def signup(update: Update, context: ContextTypes.DEFAULT_TYPE):
