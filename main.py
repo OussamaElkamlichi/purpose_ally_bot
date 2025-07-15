@@ -10,7 +10,7 @@ from telegram.ext import (
     CallbackQueryHandler,
     filters
 )
-from db_agent import add_user, get_goals,user_check, get_user_by_telegram_id, get_user_stats_message, add_session, delete_session, get_user_prod_hours, update_user_rank, show_demo_db, edit_prep, updateGoal, cron_seed, destroy_user
+from db_agent import add_user, get_goals,user_check, get_user_by_telegram_id, get_user_stats_message, add_session, delete_session, get_user_prod_hours, update_user_rank, show_demo_db, edit_prep, updateGoal, cron_seed, destroy_user, mark_as_done
 import asyncio, os, json
 from dotenv import load_dotenv
 from datetime import datetime
@@ -626,6 +626,23 @@ async def new_start(update, context):
         reply_markup=reply_markup,
     )
 
+async def update_goals(update, context):
+    user_id = update.callback_query.from_user.id
+    query = update.callback_query
+    await query.answer()  
+
+    callback_data = query.data
+    if callback_data.startswith("done_main_"):
+        goal_id = callback_data.split("_")[2] 
+        res = await asyncio.to_thread(mark_as_done, "maingoal", goal_id, user_id)
+        await query.message.reply_text(f"تم إنجاز الهدف الرئيسي ✅")
+
+    elif callback_data.startswith("done_sub_"):
+        subgoal_id = callback_data.split("_")[2] 
+        res = await asyncio.to_thread(mark_as_done,"subgoal", subgoal_id, user_id)
+        await query.message.reply_text(f"تم إنجاز الهدف الفرعي✅")
+
+
 convo_handler = ConversationHandler(
         entry_points=[
             CommandHandler("start", start),
@@ -638,6 +655,8 @@ convo_handler = ConversationHandler(
             CallbackQueryHandler(show_demo, pattern='show_demo'),
             CallbackQueryHandler(old_goals, pattern='indeed'),
             CallbackQueryHandler(new_start, pattern='new_start'),
+            CallbackQueryHandler(update_goals, pattern="done_"),
+
         ],
         states={
             MAIN_GOAL: [MessageHandler(filters.TEXT & ~filters.COMMAND, main_goal_req)],

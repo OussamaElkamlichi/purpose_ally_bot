@@ -380,3 +380,33 @@ def destroy_user(user_id):
         return 500
     finally:
         session.close()
+
+def mark_as_done(goal_type, goal_id, user_id):
+    session = Session()
+    try:
+        if goal_type == "maingoal":
+            goal = session.query(Goal).filter_by(id=goal_id, user_id=user_id).first()
+            if goal:
+                goal.status = "done"
+        elif goal_type == "subgoal":
+            subgoal = session.query(Subgoal).filter_by(id=goal_id).first()
+            if subgoal:
+                subgoal.status = "done"
+        else:
+            print(f"Invalid goal type: {goal_type}")
+            return False
+
+        session.commit()
+
+        if (goal_type == "maingoal" and goal) or (goal_type == "subgoal" and subgoal):
+            return True
+        else:
+            print(f"No rows updated for {goal_type} with ID {goal_id}")
+            return False
+
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        session.rollback()
+        return False
+    finally:
+        session.close()
