@@ -209,7 +209,7 @@ def goals_seeding(goals_list, user_id):
             # Insert each sub-goal
             for sub_goal in sub_goals:
                 subgoal_obj = Subgoal(
-                    goal_id=goal_obj.id,
+                    goal_id=goal_obj.goal_id,
                     subgoal_title=sub_goal,
                     subgoal_description="None",
                     duration="None",
