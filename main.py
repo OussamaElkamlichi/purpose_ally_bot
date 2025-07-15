@@ -177,10 +177,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         projectName = 'شريك الهمّة'
 
         keyboard = [
-            [InlineKeyboardButton('🤖 تعريف شريك الهمة',
-                                  callback_data='identification')],
-            [InlineKeyboardButton('🤔 كيف أحدّد أهدافي',
-                                  callback_data='how_to_set_goals')],
+            # [InlineKeyboardButton('🤖 تعريف شريك الهمة',
+            #                       callback_data='identification')],
+            # [InlineKeyboardButton('🤔 كيف أحدّد أهدافي',
+            #                       callback_data='how_to_set_goals')],
             [InlineKeyboardButton('📋 تسجيل أهدافي الخاصة',
                                   callback_data='set_goals')],
             # [InlineKeyboardButton('📚 الاطلاع على مسارات طلب العلم',
@@ -593,7 +593,7 @@ async def new_start(update, context):
     user = update.effective_user
     name = f"{user.first_name or ''} {user.last_name or ''}".strip() or "NoName"
 
-    res = destroy_user(user.id)
+    res = await asyncio.to_thread(destroy_user,user.id)
 
     if res != 200:
         await update.callback_query.message.reply_text("Failed to reset user data. Please try again later.")

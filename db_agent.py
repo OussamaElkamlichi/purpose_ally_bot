@@ -367,7 +367,7 @@ def destroy_user(user_id):
     session = Session()
     try:
         # Recherche de l'utilisateur par username_id
-        user = session.query(User).filter_by(username_id=user_id).first()
+        user = session.query(User).filter_by(telegram_id=user_id).first()
         if user:
             session.delete(user)
             session.commit()
