@@ -508,7 +508,7 @@ async def cancel(update, context):
 
 async def maingoal_achieved(update, context):
     user_id = update.message.from_user.id
-    stt_code, res = await get_goals(user_id)  
+    stt_code, res = await asyncio.to_thread(get_goals,user_id)  
     # await update.message.reply_text(res)
     if(len(res) == 0):
         await context.bot.send_message(user_id,
@@ -606,8 +606,8 @@ async def new_start(update, context):
 
     project_name = 'شريك الهمّة'
     keyboard = [
-        [InlineKeyboardButton('🤖 تعريف شريك الهمة', callback_data='identification')],
-        [InlineKeyboardButton('🤔 كيف أحدّد أهدافي', callback_data='how_to_set_goals')],
+        # [InlineKeyboardButton('🤖 تعريف شريك الهمة', callback_data='identification')],
+        # [InlineKeyboardButton('🤔 كيف أحدّد أهدافي', callback_data='how_to_set_goals')],
         [InlineKeyboardButton('📋 تسجيل أهدافي الخاصة', callback_data='set_goals')],
         # [InlineKeyboardButton('📚 الاطلاع على مسارات طلب العلم', callback_data='learning_tracks')],
         # [InlineKeyboardButton('📥 الاتصال بنا', callback_data='contact_us')]
