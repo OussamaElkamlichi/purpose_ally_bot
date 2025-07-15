@@ -1,7 +1,8 @@
 from flask import Flask, request, jsonify
 from main import application
 import asyncio
-from sqlalchemy.orm import sessionmaker, update, delete, select
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy import update, delete, select
 from models import DailySession, Goal, PollMappings, Subgoal, engine
 from telegram import Update, Bot
 from db_agent import reset
@@ -41,7 +42,7 @@ def reset_route():
         return jsonify({"status": "error", "message": str(e)}), 500
     
 @flask_app.route('/send_polls', methods=['GET'])
-async def fetch_and_prepare_goals(user_id):
+def fetch_and_prepare_goals(user_id):
     try:
         my_list = {}
 
@@ -83,7 +84,7 @@ async def fetch_and_prepare_goals(user_id):
         session.commit()
         # 5. Envoyer le sondage via bot
         bot = Bot(token=TOKEN)
-        await send_poll(bot, user_id, my_list)
+        send_poll(bot, -2782644259, my_list)
 
     except Exception as e:
         session.rollback()
@@ -91,9 +92,9 @@ async def fetch_and_prepare_goals(user_id):
     finally:
         session.close()
  
-async def send_poll(bot, user_id, my_list):
+def send_poll(bot, user_id, my_list):
     if not my_list:
-        await bot.send_message(
+        bot.send_message(
             user_id,
             "<blockquote>🎉 بارك الله! لقد أنجزت جميع أهدافك!</blockquote>\n\n"
             "<b>هل تريد أن توقف التنبيهات اليومية؟</b>",
@@ -111,7 +112,7 @@ async def send_poll(bot, user_id, my_list):
             if len(options) < 2:
                 options.extend(["لا يمكن إرسال تصويت", "بخيار واحد فقط، لذا نضيف هذين"])
 
-            sent_poll = await bot.send_poll(
+            sent_poll = bot.send_poll(
                 chat_id=user_id,
                 question=goal_title,
                 options=options,
@@ -127,9 +128,9 @@ async def send_poll(bot, user_id, my_list):
             )
             session.add(poll_record)
 
-        await session.commit()
+        session.commit()
 
     except Exception as e:
-        await session.rollback()
+        session.rollback()
         print(f"❌ Failed to send poll for goal '{goal_title}': {e}")
 
