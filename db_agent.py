@@ -385,11 +385,11 @@ def mark_as_done(goal_type, goal_id, user_id):
     session = Session()
     try:
         if goal_type == "maingoal":
-            goal = session.query(Goal).filter_by(id=goal_id, user_id=user_id).first()
+            goal = session.query(Goal).filter_by(goal_id=goal_id, user_id=user_id).first()
             if goal:
                 goal.status = "done"
         elif goal_type == "subgoal":
-            subgoal = session.query(Subgoal).filter_by(id=goal_id).first()
+            subgoal = session.query(Subgoal).filter_by(subgoal_id=goal_id).first()
             if subgoal:
                 subgoal.status = "done"
         else:
