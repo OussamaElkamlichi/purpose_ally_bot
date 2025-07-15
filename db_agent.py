@@ -147,7 +147,7 @@ def user_check(user_id, name, rank, prod_hours: int = 0, today_prod_hours: int =
             if checked_goals < total_goals:
                 result = {
                     "message": f"<blockquote>🍃<b>{name}</b> ،مرحباً</blockquote>\n\n"
-                               f"لقد سجّلت معنا أهدافًا في السابق. ولديك أهداف مكتملة بمعدل {checked_goals}/{total_goals}\n"
+                               f"لقد سجّلت معنا أهدافًا في السابق. ولديك أهداف مكتملة بمعدل {checked_goals}/{total_goals}\n\n"
                                f"<blockquote><b>البداية الجديدة تحمو جميع المعلومات</b></blockquote>",
                     "reply_markup": InlineKeyboardMarkup([
                         [InlineKeyboardButton('أريد أن أتابع 💪', callback_data='indeed')],

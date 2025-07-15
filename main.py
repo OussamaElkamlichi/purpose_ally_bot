@@ -1,4 +1,4 @@
-from telegram import Update, ChatAdministratorRights, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, ChatAdministratorRights, InlineKeyboardButton, InlineKeyboardMarkup, BotCommand
 from telegram.constants import ChatMemberStatus
 import requests
 from telegram.ext import (
@@ -16,7 +16,7 @@ from dotenv import load_dotenv
 from datetime import datetime
 from userGoals import UserGoals
 
-MAIN_GOAL, SUB_GOALS, EDIT_GOAL, SET_CRON, SET_CRON_TIME, SET_CRON_WEEKDAY, EDIT_CRON_TIME = range(7)
+MAIN_GOAL, SUB_GOALS, EDIT_GOAL, SET_CRON, SET_CRON_TIME, SET_CRON_WEEKDAY, EDIT_CRON_TIME, EXTRA_MAIN_GOALS, EXTRA_SUB_GOALS = range(9)
 
 
 base_dir = os.path.dirname(__file__)
@@ -30,6 +30,15 @@ load_dotenv('/home/OussamaNoobie/purpose_ally_bot/.env')
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 
 application = Application.builder().token(BOT_TOKEN).build()
+
+commands = [
+    BotCommand("start", 'البدأ'),
+    BotCommand("add_goals", "إضافة أهداف"),
+    BotCommand("goal_achieved", 'أنجزت هدف؟'),
+]
+
+async def set_command_menu():
+    await application.bot.set_my_commands(commands)
 
 async def signup(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
@@ -642,11 +651,130 @@ async def update_goals(update, context):
         res = await asyncio.to_thread(mark_as_done,"subgoal", subgoal_id, user_id)
         await query.message.reply_text(f"تم إنجاز الهدف الفرعي✅")
 
+async def add_goals(update,context):
+    await update.message.reply_text(
+        text='<b>إدخال أهداف رئيسية أخرى📋</b>\n'
+             '\n'
+             'المرجو كتابة الهدف الرئيسي وإرساله، ومتابعة <b>الإرشادات</b>\n\n'
+             'تفضل(ي) 🍃🖋️',
+        parse_mode='HTML'
+    )
+
+    return EXTRA_MAIN_GOALS
+
+async def extra_maingoals(update, context):
+    user_id = update.message.from_user.id
+    main_goal = update.message.text
+
+    if user_id not in context.user_data:
+        context.user_data[user_id] = UserGoals(user_id)
+
+    context.user_data[user_id].add_extra_maingoals(user_id, main_goal)
+
+    await update.message.reply_text(
+        'تم تسجيل الهدف الرئيسي تحت عنوان:\n\n'
+        f"<blockquote>{main_goal}</blockquote>\n\n"
+        ' <b>تفضل(ي)</b> بتحديد الهدف الفرعي \n\n',
+        parse_mode='HTML'
+    )
+    context.user_data[user_id].current_extra_main_goal = main_goal
+
+    return EXTRA_SUB_GOALS
+
+async def extra_subgoals(update, context):
+    user_id = update.message.from_user.id
+    sub_goal = update.message.text
+
+    if user_id not in context.user_data:
+        await update.message.reply_text("يبدو أنك لم تحدد هدفًا رئيسيًا بعد. يرجى البدء بتحديد هدفك الرئيسي.")
+        return ConversationHandler.END
+
+    if sub_goal.lower() in ["انتهاء", "إنتهاء", "done"]:
+        goals_count = context.user_data[user_id].extra_goals_count()
+        # if len(goals_count.keys()) < 2:
+        #     # Inform user they need at least two goals
+        #     await update.message.reply_text(
+        #         'المرجو تحديد هدفين رئيسيين على الأقل.\n'
+        #         'اكتب(ي) "آخر" لإضافة هدف رئيسي جديد.'
+        #     )
+        #     return SUB_GOALS  # Stay in the same state and avoid sending the next message
+        # else:
+        # Proceed to end the input if goals count is sufficient
+        goals_seed = context.user_data[user_id].extra_launch(user_id)
+        keyboard = [[InlineKeyboardButton(
+            "كيف ستبدو أهدافك؟", callback_data="show_new_goals")]]
+        # reply_markup = InlineKeyboardMarkup(keyboard)
+        await update.message.reply_text(
+            '<blockquote>تم إنهاء الإدخال 🎉</blockquote>\n',
+            # reply_markup=reply_markup,
+            parse_mode='HTML'
+        )
+        return ConversationHandler.END
+    elif sub_goal.lower() in ["آخر", "اخر"]:
+        # Handle adding a new main goal
+        await update.message.reply_text(
+            'تفضل(ي) بتحديد الهدف الرئيسي الآخر📝\n',
+            parse_mode='HTML'
+        )
+        return EXTRA_MAIN_GOALS
+
+    # Otherwise, add the sub-goal under the current main goal
+    main_goal = context.user_data[user_id].current_extra_main_goal
+    context.user_data[user_id].add_extra_subgoals(user_id, main_goal, sub_goal)
+
+    # Only send the confirmation message when a sub-goal is added successfully
+    await update.message.reply_text(
+        'تم تسجيل الهدف الفرعي تحت عنوان:\n'
+        f"<blockquote>{sub_goal}</blockquote>\n"
+        'الأهداف الحالية:\n'
+        f"{context.user_data[user_id].get_extra_goals_list()}\n\n"
+        'اكتب(ي) "انتهاء" لإنهاء الإدخال\n'
+        'أكتب(ي) "آخر" من أجل إضافة هدف رئيسي آخر',
+        parse_mode='HTML'
+    )
+
+    return EXTRA_SUB_GOALS
+
+async def show_new_goals(update, context):
+    await update.callback_query.answer()
+    user_id = update.callback_query.from_user.id
+    keyboard = [
+        [InlineKeyboardButton("تعديل/حذف نص الأهداف", callback_data="edit_op")],
+    ]
+    unformatted_list = edit_prep(user_id)
+    formatted_text = ""
+    main_goal_indent = "🎯 " 
+    sub_goal_indent = "    • "
+
+    for item in unformatted_list:
+        if item["type"] == "main":
+            formatted_text += main_goal_indent + item['text'] + "\n"
+        elif item["type"] == "sub":
+            formatted_text += sub_goal_indent + item['text'] + "\n"
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.callback_query.message.reply_text(
+        '<blockquote>تفاصيل الأهداف🍃</blockquote>\n'
+        f"\n{formatted_text}\n"
+        f"<b>الإرسال اليومي على الساعة:</b> 00:00 ",
+        # reply_markup=reply_markup,
+        parse_mode='HTML'
+    )
+    keyboard = [
+        [InlineKeyboardButton("تعديل/حذف نص الأهداف", callback_data="edit_op")],
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.callback_query.message.reply_text(
+        '<blockquote>استعن بالله ولا تعجز 🍃</blockquote>\n',
+        reply_markup=reply_markup,
+        parse_mode='HTML'
+    )
 
 convo_handler = ConversationHandler(
         entry_points=[
             CommandHandler("start", start),
             CommandHandler("goal_achieved", maingoal_achieved),
+            CommandHandler("test", set_command_menu),
+            CommandHandler("add_goals", add_goals),
             CallbackQueryHandler(set_goals, pattern='set_goals'),
             CallbackQueryHandler(edit_op, pattern='edit_op'),
             CallbackQueryHandler(edit_goal_selection, pattern=".*\*\*\*.*"),
@@ -656,6 +784,7 @@ convo_handler = ConversationHandler(
             CallbackQueryHandler(old_goals, pattern='indeed'),
             CallbackQueryHandler(new_start, pattern='new_start'),
             CallbackQueryHandler(update_goals, pattern="done_"),
+            CallbackQueryHandler(show_new_goals, pattern='show_new_goals'),
 
         ],
         states={
@@ -666,6 +795,9 @@ convo_handler = ConversationHandler(
             SET_CRON_TIME: [MessageHandler(filters.TEXT & ~filters.COMMAND, set_cron_time)],
             EDIT_CRON_TIME: [MessageHandler(filters.TEXT & ~filters.COMMAND, edit_cron_time)],
             SET_CRON_WEEKDAY: [CallbackQueryHandler(set_cron, pattern='weekday')],
+            EXTRA_MAIN_GOALS: [MessageHandler(filters.TEXT & ~filters.COMMAND, extra_maingoals)],
+            EXTRA_SUB_GOALS: [MessageHandler(filters.TEXT & ~filters.COMMAND, extra_subgoals)],
+
         },
         fallbacks=[CommandHandler('cancel', cancel)]
     )
