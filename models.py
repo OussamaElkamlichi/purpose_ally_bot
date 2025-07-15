@@ -103,9 +103,9 @@ class PollMappings(Base):
 
     poll_id = Column(String(255), primary_key=True)
 
-    goal_id = Column(Integer, ForeignKey("goals.id"), nullable=True)
+    goal_id = Column(Integer, ForeignKey("goals.goal_id"), nullable=True)
 
-    user_id = Column(BigInteger, ForeignKey("users.id"), nullable=True)
+    user_id = Column(BigInteger, ForeignKey("users.telegram_id"), nullable=True)
 
 
 def create_tables():

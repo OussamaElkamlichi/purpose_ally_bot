@@ -56,7 +56,7 @@ async def fetch_and_prepare_goals(user_id):
 
             # 2. Récupérer les sous-objectifs non terminés
             subgoals = session.query(Subgoal).filter(
-                Subgoal.goal_id == goal.id,
+                Subgoal.goal_id == goal.goal_id,
                 Subgoal.status != 'done'
             ).all()
 
@@ -68,13 +68,13 @@ async def fetch_and_prepare_goals(user_id):
                 })
 
             my_list[goal.goal_title] = {
-                "goal_id": goal.id,
+                "goal_id": goal.goal_id,
                 "subgoals": subgoals_data
             }
 
             daily_session = DailySession(
                     user_id=user_id,
-                    goal_id=sub.id,  
+                    goal_id=sub.subgoal_id,  
                     status="started"
                 )
             session.add(daily_session)
