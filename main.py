@@ -8,9 +8,10 @@ from telegram.ext import (
     MessageHandler,
     ContextTypes,
     CallbackQueryHandler,
+    PollAnswerHandler,
     filters
 )
-from db_agent import add_user, get_goals,user_check, get_user_by_telegram_id, get_user_stats_message, add_session, delete_session, get_user_prod_hours, update_user_rank, show_demo_db, edit_prep, updateGoal, cron_seed, destroy_user, mark_as_done
+from db_agent import add_user, get_daily_goals_check, get_goals,user_check, get_user_by_telegram_id, get_user_stats_message, add_session, delete_session, get_user_prod_hours, update_user_rank, show_demo_db, edit_prep, updateGoal, cron_seed, destroy_user, mark_as_done
 import asyncio, os, json
 from dotenv import load_dotenv
 from datetime import datetime
@@ -768,6 +769,25 @@ async def show_new_goals(update, context):
         parse_mode='HTML'
     )
 
+async def daily_goals_checking(update, context):
+    poll_answer = update.poll_answer
+    poll_id = poll_answer.poll_id
+    option_ids = poll_answer.option_ids
+    user_id = poll_answer.user.id
+
+    res = await asyncio.to_thread(get_daily_goals_check, user_id, poll_id, option_ids)
+
+    if res:
+         context.bot.send_message(
+            chat_id=user_id,
+            text="تم تسجيل مهامك اليومية بنجاح ✨"
+        )
+    else:
+        context.bot.send_message(
+            chat_id=user_id,
+            text="حدث خطأ أثناء تسجيل مهامك اليومية. يرجى المحاولة مرة أخرى لاحقًا."
+        )
+        
 convo_handler = ConversationHandler(
         entry_points=[
             CommandHandler("start", start),
@@ -807,4 +827,6 @@ application.add_handler(MessageHandler(filters.TEXT & filters.Regex(r'^#إضاف
 application.add_handler(MessageHandler(filters.TEXT & filters.Regex(r'^#استثماراتي'), handle_stats))
 application.add_handler(MessageHandler(filters.TEXT & filters.Regex(r'^#حذف_حصة'), handle_delete_session))
 application.add_handler(MessageHandler(filters.TEXT & filters.Regex(r'^#عرض_الخصائص'), show_commands))
+application.add_handler(PollAnswerHandler(daily_goals_checking))
+
 

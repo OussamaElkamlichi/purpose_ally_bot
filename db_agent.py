@@ -1,6 +1,6 @@
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy import func
-from models import engine, User, Goal, Subgoal, Scheduled
+from sqlalchemy import func, select, update, delete
+from models import DailySession, PollMappings, engine, User, Goal, Subgoal, Scheduled
 from datetime import datetime
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton
 
@@ -404,6 +404,47 @@ def mark_as_done(goal_type, goal_id, user_id):
             print(f"No rows updated for {goal_type} with ID {goal_id}")
             return False
 
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        session.rollback()
+        return False
+    finally:
+        session.close()
+
+def get_daily_goals_check(poll_id, user_id, option_ids):
+    session = Session()
+    try:
+        result = session.execute(
+            select(PollMappings.goal_id).where(
+                PollMappings.poll_id == poll_id,
+                PollMappings.user_id == user_id
+            )
+        )
+        mappings = result.fetchall()  # Liste de tuples
+
+        # 2. Marquer les sous-objectifs sélectionnés comme "done"
+        for option_id in option_ids:
+            if option_id < len(mappings):
+                subgoal_id = mappings[option_id][0]
+                session.execute(
+                    update(DailySession)
+                    .where(
+                        DailySession.user_id == user_id,
+                        DailySession.goal_id == subgoal_id,
+                        DailySession.status == "started"
+                    )
+                    .values(status="done")
+                )
+
+        # 3. Supprimer les poll mappings
+        session.execute(
+            delete(PollMappings).where(PollMappings.poll_id == poll_id)
+        )
+
+        # 4. Commit final
+        session.commit()
+        
+        return True
     except Exception as e:
         print(f"An error occurred: {e}")
         session.rollback()

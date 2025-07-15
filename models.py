@@ -79,6 +79,35 @@ class Scheduled(Base):
     created_at = Column(TIMESTAMP, nullable=False, server_default=text("CURRENT_TIMESTAMP"))
     job_id = Column(String(255), nullable=True)
 
+class DailySession(Base):
+    __tablename__ = "daily_sessions"
+
+    daily_session_id = Column(Integer, primary_key=True, autoincrement=True)
+
+    user_id = Column(BigInteger, nullable=False)
+    goal_id = Column(Integer, nullable=False)
+
+    status = Column(String(50), nullable=True, default="incomplete")
+
+    completed_at = Column(DateTime, nullable=True)
+
+    session_timestamp = Column(
+        TIMESTAMP,
+        nullable=True,
+        server_default=func.current_timestamp(),
+        onupdate=func.current_timestamp()
+    )
+
+class PollMappings(Base):
+    __tablename__ = "poll_mappings"
+
+    poll_id = Column(String(255), primary_key=True)
+
+    goal_id = Column(Integer, ForeignKey("goals.id"), nullable=True)
+
+    user_id = Column(BigInteger, ForeignKey("users.id"), nullable=True)
+
+
 def create_tables():
     Base.metadata.create_all(engine)
     print("✅ Tables created.")
