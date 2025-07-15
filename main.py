@@ -10,7 +10,7 @@ from telegram.ext import (
     CallbackQueryHandler,
     filters
 )
-from db_agent import add_user, get_goals,user_check, get_user_by_telegram_id, get_user_stats_message, add_session, delete_session, get_user_prod_hours, update_user_rank, show_demo_db, edit_prep, updateGoal, cron_seed
+from db_agent import add_user, get_goals,user_check, get_user_by_telegram_id, get_user_stats_message, add_session, delete_session, get_user_prod_hours, update_user_rank, show_demo_db, edit_prep, updateGoal, cron_seed, destroy_user
 import asyncio, os, json
 from dotenv import load_dotenv
 from datetime import datetime
@@ -336,7 +336,8 @@ async def edit_op(update, context):
 
 async def edit_goal_selection(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    await query.answer()
+    await query.edit_message_text("⏳ معالجة طلبك...", parse_mode="HTML")
+
     
     if "***" in query.data:
         goal_type, goal_id, goal_text = query.data.split("***")
@@ -565,26 +566,9 @@ async def old_goals(update, context):
     await update.callback_query.answer()
     user_id = update.callback_query.from_user.id
     goals_list = show_demo_db(user_id)
-    # main_goals = list(goals_list.keys())  # Collect all main goals as options
-
-    # await update.callback_query.message.reply_text(
-    #     '<blockquote>هكذا ستبدو أهدافك 🍃</blockquote>\n',
-    #     parse_mode='HTML'
-    # )
     unformatted_list = edit_prep(user_id)
-    # goals_list = await show_demo_db_advanced(user_id)
-    # await context.bot.send_poll(
-    #     chat_id=update.effective_chat.id,
-    #     question="سجّل مهامك اليومية أثابك الله",
-    #     options=main_goals,
-    #     is_anonymous=False,
-    #     allows_multiple_answers=True,
-    # )
-
     keyboard = [
         [InlineKeyboardButton("تعديل/حذف نص الأهداف", callback_data="edit_op")],
-        [InlineKeyboardButton("تحديد وقت إرسال المهمات",
-                              callback_data="get_location_call")]
     ]
     formatted_text = ""
     main_goal_indent = "🎯 " 
@@ -595,11 +579,6 @@ async def old_goals(update, context):
             formatted_text += main_goal_indent + item['text'] + "\n"
         elif item["type"] == "sub":
             formatted_text += sub_goal_indent + item['text'] + "\n"
-    # status_code, cron_time, job_Id = get_cron_time(user_id)
-    # if status_code == 200:
-    #     time = cron_time
-    # else:
-    #     time = "لم يتحدد بعد"
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.callback_query.message.reply_text(
         '<blockquote>تفاصيل الأهداف🍃</blockquote>\n'
@@ -608,6 +587,45 @@ async def old_goals(update, context):
         reply_markup=reply_markup,
         parse_mode='HTML'
     )
+
+async def new_start(update, context):
+    await update.callback_query.answer()
+    user = update.effective_user
+    name = f"{user.first_name or ''} {user.last_name or ''}".strip() or "NoName"
+
+    res = destroy_user(user.id)
+
+    if res != 200:
+        await update.callback_query.message.reply_text("Failed to reset user data. Please try again later.")
+        return  
+
+    result = await asyncio.to_thread(add_user, user.id, name, default_rank)
+    if result is None:
+        await update.callback_query.message.reply_text("Failed to initialize user data. Please try again later.")
+        return  
+
+    project_name = 'شريك الهمّة'
+    keyboard = [
+        [InlineKeyboardButton('🤖 تعريف شريك الهمة', callback_data='identification')],
+        [InlineKeyboardButton('🤔 كيف أحدّد أهدافي', callback_data='how_to_set_goals')],
+        [InlineKeyboardButton('📋 تسجيل أهدافي الخاصة', callback_data='set_goals')],
+        # [InlineKeyboardButton('📚 الاطلاع على مسارات طلب العلم', callback_data='learning_tracks')],
+        # [InlineKeyboardButton('📥 الاتصال بنا', callback_data='contact_us')]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    # Send the welcome message
+    await update.callback_query.message.reply_text(
+        f'🌹السلام عليكم <b>{name}</b>\n'
+        '\n'
+        f'مرحباً بكم معنا في <b>{project_name}</b> رفيقكم في تحقيق أهدافكم وشريككم نحو مستوى وعي أرقى 🍃\n'
+        '\n'
+        ' اختر(ي) طلبك من القائمة أسفله واستعن بالله ولا تعجز✔️'
+        '\n',
+        parse_mode='HTML',
+        reply_markup=reply_markup,
+    )
+
 convo_handler = ConversationHandler(
         entry_points=[
             CommandHandler("start", start),
@@ -619,6 +637,7 @@ convo_handler = ConversationHandler(
             CallbackQueryHandler(edit_cron, pattern='edit_cron_launch'),
             CallbackQueryHandler(show_demo, pattern='show_demo'),
             CallbackQueryHandler(old_goals, pattern='indeed'),
+            CallbackQueryHandler(new_start, pattern='new_start'),
         ],
         states={
             MAIN_GOAL: [MessageHandler(filters.TEXT & ~filters.COMMAND, main_goal_req)],

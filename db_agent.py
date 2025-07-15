@@ -159,7 +159,7 @@ def user_check(user_id, name, rank, prod_hours: int = 0, today_prod_hours: int =
             elif checked_goals == total_goals:
                 result = {
                     "message": f"<blockquote>🍃<b>{name}</b> ،مرحباً</blockquote>\n\n"
-                               f"لقد سجّلت معنا أهدافًا في السابق. ولديك جميع الأهداف مكتملة بمعدل {checked_goals}/{total_goals}\n"
+                               f"لقد سجّلت معنا أهدافًا في السابق. ولديك جميع الأهداف مكتملة بمعدل {checked_goals}/{total_goals}\n\n"
                                f"<blockquote><b>البداية الجديدة تحمو جميع المعلومات</b></blockquote>",
                     "reply_markup": InlineKeyboardMarkup([
                         [InlineKeyboardButton('أريد بداية جديدة 🆕', callback_data='new_start')]
@@ -360,5 +360,23 @@ def get_goals(user_id: int):
     except Exception as e:
         print(f"An error occurred: {e}")
         return 500, str(e)
+    finally:
+        session.close()
+
+def destroy_user(user_id):
+    session = Session()
+    try:
+        # Recherche de l'utilisateur par username_id
+        user = session.query(User).filter_by(username_id=user_id).first()
+        if user:
+            session.delete(user)
+            session.commit()
+            return 200
+        else:
+            return 500
+    except Exception as err:
+        print("Error:", err)
+        session.rollback()
+        return 500
     finally:
         session.close()
