@@ -5,6 +5,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy import update, delete, select
 from models import DailySession, Goal, PollMappings, Subgoal, engine
 from telegram import Update, Bot
+from telegram.constants import ParseMode
 from db_agent import reset
 
 # Define your Telegram bot token here
@@ -42,10 +43,20 @@ def reset_route():
         return jsonify({"status": "error", "message": str(e)}), 500
     
 @flask_app.route('/send_polls', methods=['GET'])
-def fetch_and_prepare_goals(user_id):
+def fetch_and_prepare_goals():
     try:
-        my_list = {}
+        user_id = 7965405588  # ou passe-le en paramètre GET
+        asyncio.run(_async_prepare_and_send(user_id))
+        return jsonify({"status": "success", "message": "✅ Polls sent"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
 
+
+async def _async_prepare_and_send(user_id):
+    session = Session()
+    my_list = {}
+
+    try:
         # 1. Récupérer les objectifs principaux non terminés
         goals = session.query(Goal).filter(
             Goal.user_id == user_id,
@@ -55,50 +66,49 @@ def fetch_and_prepare_goals(user_id):
         for goal in goals:
             subgoals_data = []
 
-            # 2. Récupérer les sous-objectifs non terminés
+            # 2. Sous-objectifs non terminés
             subgoals = session.query(Subgoal).filter(
                 Subgoal.goal_id == goal.goal_id,
                 Subgoal.status != 'done'
             ).all()
 
             for sub in subgoals:
-                # Ajouter dans la liste à envoyer
                 subgoals_data.append({
                     "subgoal_title": sub.subgoal_title,
                     "status": sub.status
                 })
+
+                daily_session = DailySession(
+                    user_id=user_id,
+                    goal_id=sub.subgoal_id,
+                    status="started"
+                )
+                session.add(daily_session)
 
             my_list[goal.goal_title] = {
                 "goal_id": goal.goal_id,
                 "subgoals": subgoals_data
             }
 
-            daily_session = DailySession(
-                    user_id=user_id,
-                    goal_id=sub.subgoal_id,  
-                    status="started"
-                )
-            session.add(daily_session)
-
-        # 4. Commit après la boucle
         session.commit()
-        # 5. Envoyer le sondage via bot
+
         bot = Bot(token=TOKEN)
-        send_poll(bot, -2782644259, my_list)
+        await send_poll(bot, -2782644259, my_list, session)
 
     except Exception as e:
         session.rollback()
         print(f"❌ Error during fetch_and_prepare_goals: {e}")
     finally:
         session.close()
- 
-def send_poll(bot, user_id, my_list):
+
+
+async def send_poll(bot, user_id, my_list, session):
     if not my_list:
-        bot.send_message(
-            user_id,
-            "<blockquote>🎉 بارك الله! لقد أنجزت جميع أهدافك!</blockquote>\n\n"
-            "<b>هل تريد أن توقف التنبيهات اليومية؟</b>",
-            parse_mode='HTML'
+        await bot.send_message(
+            chat_id=user_id,
+            text="<blockquote>🎉 بارك الله! لقد أنجزت جميع أهدافك!</blockquote>\n\n"
+                 "<b>هل تريد أن توقف التنبيهات اليومية؟</b>",
+            parse_mode=ParseMode.HTML
         )
         return
 
@@ -108,19 +118,18 @@ def send_poll(bot, user_id, my_list):
             sub_goals = goal_data["subgoals"]
             options = [sub["subgoal_title"] for sub in sub_goals]
 
-            # Ajouter deux options si une seule
             if len(options) < 2:
                 options.extend(["لا يمكن إرسال تصويت", "بخيار واحد فقط، لذا نضيف هذين"])
 
-            sent_poll = bot.send_poll(
-                chat_id=user_id,
+            sent_poll = await bot.send_poll(
+                chat_id=-1002782644259,
+                message_thread_id=18,   
                 question=goal_title,
                 options=options,
                 is_anonymous=False,
                 allows_multiple_answers=True,
             )
 
-            # Sauvegarder dans la table polls
             poll_record = PollMappings(
                 poll_id=sent_poll.poll.id,
                 goal_id=goal_id,
@@ -133,4 +142,3 @@ def send_poll(bot, user_id, my_list):
     except Exception as e:
         session.rollback()
         print(f"❌ Failed to send poll for goal '{goal_title}': {e}")
-
