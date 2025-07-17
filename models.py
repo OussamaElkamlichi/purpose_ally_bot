@@ -31,6 +31,7 @@ class User(Base):
     id = Column(Integer, primary_key=True)
     telegram_id = Column(BigInteger, unique=True, nullable=False)
     name = Column(String(100))
+    username = Column(String(100), nullable=True)
     rank = Column(String(100), default=default_rank)
     prod_hours = Column(Integer, default=0)
     today_prod_hours = Column(Integer, default=0)
