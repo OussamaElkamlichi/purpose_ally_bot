@@ -41,14 +41,6 @@ def reset_route():
         return jsonify({"status": "success", "message": "today_prod_hours reset to 0 for all users"}), 200
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
-    
-@flask_app.route('/reset', methods=['GET'])
-def reset_route():
-    try:
-        reset()
-        return jsonify({"status": "success", "message": "today_prod_hours reset to 0 for all users"}), 200
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
 
 @flask_app.route('/send_polls', methods=['GET'])
 def fetch_and_prepare_goals():
@@ -135,6 +127,8 @@ async def send_poll(bot, user_id, thread_id, my_list, session, mention):
         return
 
     try:
+        sent_intro = False  # ✅ هذا هو المفتاح
+
         for goal_title, goal_data in my_list.items():
             goal_id = goal_data["goal_id"]
             sub_goals = goal_data["subgoals"]
@@ -143,16 +137,20 @@ async def send_poll(bot, user_id, thread_id, my_list, session, mention):
             if len(options) < 2:
                 options.extend(["لا يمكن إرسال تصويت", "بخيار واحد فقط، لذا نضيف هذين"])
 
-            # Prepend mention in the question:
+            # ✅ أرسل الرسالة التعريفية مرة واحدة فقط
+            if not sent_intro:
+                await bot.send_message(
+                    chat_id=-1002782644259,
+                    message_thread_id=thread_id,
+                    text=f"{mention} - تفضل بتسجيل تقدمك لليوم مشكورًا 👇",
+                    parse_mode="HTML"
+                )
+                sent_intro = True
+
+            # أرسل التصويت
             question = f"{goal_title}"
-            await bot.send_message(
-                chat_id=-1002782644259,
-                message_thread_id=thread_id,
-                text=f"{mention} - تفضل بتسجيل تقدمك لليوم مشكورًا 👇",
-                parse_mode="HTML"
-            )
             sent_poll = await bot.send_poll(
-                chat_id=-1002782644259,  # Your group chat ID
+                chat_id=-1002782644259,
                 message_thread_id=thread_id,
                 question=question,
                 options=options,
@@ -160,14 +158,106 @@ async def send_poll(bot, user_id, thread_id, my_list, session, mention):
                 allows_multiple_answers=True,
             )
 
+            # سجل التصويت في قاعدة البيانات
             poll_record = PollMappings(
                 poll_id=sent_poll.poll.id,
                 goal_id=goal_id,
                 user_id=user_id
             )
             session.add(poll_record)
+
         session.commit()
 
     except Exception as e:
         session.rollback()
         print(f"❌ Failed to send poll for user {user_id}, goal '{goal_title}': {e}")
+
+@flask_app.route('/weekly_stats', methods=['GET'])
+def fetch_and_prepare_stats():
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            task = loop.create_task(_async_send_stats_for_all_users())
+        else:
+            loop.run_until_complete(_async_send_stats_for_all_users())
+        return jsonify({"status": "success", "message": "✅ stats sent to all users"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+async def _async_send_stats_for_all_users():
+    session = Session()
+    try:
+        users = session.query(User).all()
+        for user in users:
+            await send_stats(user.telegram_id)
+    finally:
+        session.close()
+
+def progress_bar(percentage, length=20):
+    percentage = min(percentage, 100)  # Prevent values over 100%
+    completed = int((percentage / 100) * length)
+    return "█" * completed + "░" * (length - completed) + f" {percentage:.1f}%"
+
+
+async def send_stats(user_id):
+    try:
+        # Fetch data from the database
+        total_goals, total_assigned_subgoals, completed_subgoals, completed_sessions, total_sessions = await fetch_weekly_data(user_id)
+
+        # Calculate progress percentages (handle division by zero)
+        goal_progress = (completed_subgoals / total_assigned_subgoals * 100) if total_assigned_subgoals > 0 else 0
+        session_progress = (completed_sessions / total_sessions * 100) if total_sessions > 0 else 0
+
+        # Generate the report message
+        report_message = (
+            "📊 *تقرير التقدم الأسبوعي* 📊\n\n"
+            f"🏆 *الأهداف الرئيسية:* {total_goals} هدف\n"
+            f"🎯 *الأهداف الفرعية المكتملة:* {completed_subgoals} هدف فرعي\n"
+            f"🕒 *الجلسات اليومية المكتملة:* {completed_sessions}/{total_sessions}\n\n"
+            "🚀 *تقدم الأهداف:*\n"
+            f"{progress_bar(goal_progress)}\n\n"
+            "📅 *تقدم الجلسات اليومية:*\n"
+            f"{progress_bar(session_progress)}\n\n"
+            "✅ *استمر في العمل الجيد!* 💪"
+        )
+
+        # Send the report message
+        await bot.send_message(chat_id=-1002782644259, message_thread_id=18,  text=report_message, parse_mode="Markdown")
+    except Exception as e:
+        print(f"Error in weekly_cron: {e}")
+
+async def fetch_weekly_data(user_id):
+    session = Session()
+    try:
+        # Total goals
+        total_goals = session.query(func.count()).select_from(Goal).filter(Goal.user_id == user_id).scalar()
+
+        # Total assigned subgoals (subgoals where goal belongs to the user)
+        total_assigned_subgoals = session.query(func.count()).select_from(Subgoal).join(Goal).filter(Goal.user_id == user_id).scalar()
+
+        # Completed subgoals for that user
+        completed_subgoals = session.query(func.count()).select_from(Subgoal).join(Goal).filter(
+            Goal.user_id == user_id,
+            Subgoal.status == 'done'
+        ).scalar()
+
+        # Completed daily sessions
+        completed_sessions = session.query(func.count()).select_from(DailySession).filter(
+            DailySession.user_id == user_id,
+            DailySession.status == 'done'
+        ).scalar()
+
+        # Total daily sessions
+        total_sessions = session.query(func.count()).select_from(DailySession).filter(
+            DailySession.user_id == user_id
+        ).scalar()
+
+        print(total_goals, total_assigned_subgoals, completed_subgoals, completed_sessions, total_sessions)
+        return total_goals, total_assigned_subgoals, completed_subgoals, completed_sessions, total_sessions
+
+    except Exception as e:
+        print(f"Database error: {e}")
+        return 0, 0, 0, 0, 0
+
+    finally:
+        session.close()
