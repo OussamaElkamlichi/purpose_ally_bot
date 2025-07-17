@@ -2,7 +2,7 @@ from flask import Flask, request, jsonify
 from main import application
 import asyncio
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy import update, delete, select
+from sqlalchemy import update, delete, select, func
 from models import DailySession, Goal, PollMappings, Subgoal, engine, User
 from telegram import Update, Bot
 from telegram.constants import ParseMode
