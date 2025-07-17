@@ -9,10 +9,10 @@ from telegram.constants import ParseMode
 from db_agent import reset
 
 # Define your Telegram bot token here
-TOKEN = "YOUR_TELEGRAM_BOT_TOKEN"
+TOKEN = ""
 
 flask_app = Flask(__name__)
-
+bot = application.bot
 Session = sessionmaker(bind=engine)
 session = Session()
 
@@ -67,7 +67,7 @@ async def _async_send_polls_for_all_users():
             username = getattr(user, "username", None)
 
             # Compose mention text: prefer username, else fallback to user_id mention
-            mention = f"[User](tg://user?id={user_id})"
+            mention = f"@{username}"
 
             await send_poll(bot, user_id, 18, my_list, session, mention)
 
