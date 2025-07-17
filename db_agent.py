@@ -6,12 +6,13 @@ from telegram import InlineKeyboardMarkup, InlineKeyboardButton
 
 Session = sessionmaker(bind=engine)
 
-def add_user(telegram_id: int, name: str, rank: str ,
+def add_user(telegram_id: int, username: str, name: str, rank: str ,
              prod_hours: int = 0, today_prod_hours: int = 0,
              highest_daily_prod: int = 0, challenges: int = 0):
     session = Session()
     user = User(
         telegram_id=telegram_id,
+        username=username,
         name=name,
         rank=rank,
         prod_hours=prod_hours,

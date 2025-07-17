@@ -44,14 +44,14 @@ async def signup(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     telegram_id = user.id
     name = f"{user.first_name or ''} {user.last_name or ''}".strip() or "NoName"
-
+    username = user.username or None
     existing_user = await asyncio.to_thread(get_user_by_telegram_id, telegram_id)
 
     if existing_user:
         await update.message.reply_text("أنت مُسجل بالفعل ✅")
     else:
         # إضافة المستخدم للقاعدة مع الرتبة الافتراضية
-        res = await asyncio.to_thread(add_user, telegram_id, name, default_rank)
+        res = await asyncio.to_thread(add_user, telegram_id, username ,name, default_rank)
         chat_id = update.effective_chat.id
         welcome_message = (
             f"مرحبًا بك يا {res} 🌟\n\n"
@@ -601,14 +601,14 @@ async def new_start(update, context):
     await update.callback_query.answer()
     user = update.effective_user
     name = f"{user.first_name or ''} {user.last_name or ''}".strip() or "NoName"
-
+    username=user.username or None
     res = await asyncio.to_thread(destroy_user,user.id)
 
     if res != 200:
         await update.callback_query.message.reply_text("Failed to reset user data. Please try again later.")
         return  
 
-    result = await asyncio.to_thread(add_user, user.id, name, default_rank)
+    result = await asyncio.to_thread(add_user, user.id, username, name, default_rank)
     if result is None:
         await update.callback_query.message.reply_text("Failed to initialize user data. Please try again later.")
         return  

@@ -3,7 +3,7 @@ from main import application
 import asyncio
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import update, delete, select
-from models import DailySession, Goal, PollMappings, Subgoal, engine
+from models import DailySession, Goal, PollMappings, Subgoal, engine, User
 from telegram import Update, Bot
 from telegram.constants import ParseMode
 from db_agent import reset
@@ -45,19 +45,39 @@ def reset_route():
 @flask_app.route('/send_polls', methods=['GET'])
 def fetch_and_prepare_goals():
     try:
-        user_id = 7965405588  # ou passe-le en paramètre GET
-        asyncio.run(_async_prepare_and_send(user_id))
-        return jsonify({"status": "success", "message": "✅ Polls sent"})
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            task = loop.create_task(_async_send_polls_for_all_users())
+        else:
+            loop.run_until_complete(_async_send_polls_for_all_users())
+        return jsonify({"status": "success", "message": "✅ Polls sent to all users"})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
-
-async def _async_prepare_and_send(user_id):
+async def _async_send_polls_for_all_users():
     session = Session()
-    my_list = {}
-
     try:
-        # 1. Récupérer les objectifs principaux non terminés
+        # Fetch all users (adjust model/field names accordingly)
+        users = session.query(User).all()
+
+        for user in users:
+            user_id = user.telegram_id
+            # Prepare goals data per user
+            my_list = await _fetch_user_goals(session, user_id)
+            username = getattr(user, "username", None)
+
+            # Compose mention text: prefer username, else fallback to user_id mention
+            mention = f"[User](tg://user?id={user_id})"
+
+            await send_poll(bot, user_id, 18, my_list, session, mention)
+
+    finally:
+        session.close()
+
+
+async def _fetch_user_goals(session, user_id):
+    my_list = {}
+    try:
         goals = session.query(Goal).filter(
             Goal.user_id == user_id,
             Goal.status != 'done'
@@ -66,7 +86,6 @@ async def _async_prepare_and_send(user_id):
         for goal in goals:
             subgoals_data = []
 
-            # 2. Sous-objectifs non terminés
             subgoals = session.query(Subgoal).filter(
                 Subgoal.goal_id == goal.goal_id,
                 Subgoal.status != 'done'
@@ -91,23 +110,20 @@ async def _async_prepare_and_send(user_id):
             }
 
         session.commit()
-
-        bot = Bot(token=TOKEN)
-        await send_poll(bot, -2782644259, my_list, session)
-
     except Exception as e:
         session.rollback()
-        print(f"❌ Error during fetch_and_prepare_goals: {e}")
-    finally:
-        session.close()
+        print(f"❌ Error fetching goals for user {user_id}: {e}")
+
+    return my_list
 
 
-async def send_poll(bot, user_id, my_list, session):
+async def send_poll(bot, user_id, thread_id, my_list, session, mention):
     if not my_list:
         await bot.send_message(
             chat_id=user_id,
-            text="<blockquote>🎉 بارك الله! لقد أنجزت جميع أهدافك!</blockquote>\n\n"
-                 "<b>هل تريد أن توقف التنبيهات اليومية؟</b>",
+            message_thread_id=thread_id,
+            text=f"<blockquote>🎉 بارك الله! لقد أنجزت جميع أهدافك!</blockquote>\n\n"
+                 f"<b>{mention} هل تريد أن توقف التنبيهات اليومية؟</b>",
             parse_mode=ParseMode.HTML
         )
         return
@@ -121,10 +137,13 @@ async def send_poll(bot, user_id, my_list, session):
             if len(options) < 2:
                 options.extend(["لا يمكن إرسال تصويت", "بخيار واحد فقط، لذا نضيف هذين"])
 
+            # Prepend mention in the question:
+            question = f"{mention} - {goal_title}"
+
             sent_poll = await bot.send_poll(
-                chat_id=-1002782644259,
-                message_thread_id=18,   
-                question=goal_title,
+                chat_id=-1002782644259,  # Your group chat ID
+                message_thread_id=thread_id,
+                question=question,
                 options=options,
                 is_anonymous=False,
                 allows_multiple_answers=True,
@@ -136,9 +155,8 @@ async def send_poll(bot, user_id, my_list, session):
                 user_id=user_id
             )
             session.add(poll_record)
-
         session.commit()
 
     except Exception as e:
         session.rollback()
-        print(f"❌ Failed to send poll for goal '{goal_title}': {e}")
+        print(f"❌ Failed to send poll for user {user_id}, goal '{goal_title}': {e}")
