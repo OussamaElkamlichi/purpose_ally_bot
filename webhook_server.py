@@ -42,6 +42,14 @@ def reset_route():
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
     
+@flask_app.route('/reset', methods=['GET'])
+def reset_route():
+    try:
+        reset()
+        return jsonify({"status": "success", "message": "today_prod_hours reset to 0 for all users"}), 200
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
 @flask_app.route('/send_polls', methods=['GET'])
 def fetch_and_prepare_goals():
     try:
@@ -65,9 +73,7 @@ async def _async_send_polls_for_all_users():
             # Prepare goals data per user
             my_list = await _fetch_user_goals(session, user_id)
             username = getattr(user, "username", None)
-
-            # Compose mention text: prefer username, else fallback to user_id mention
-            mention = f"@{username}"
+            mention = f'<a href="tg://user?id={user_id}">{user.name}</a>'
 
             await send_poll(bot, user_id, 18, my_list, session, mention)
 
@@ -138,8 +144,13 @@ async def send_poll(bot, user_id, thread_id, my_list, session, mention):
                 options.extend(["لا يمكن إرسال تصويت", "بخيار واحد فقط، لذا نضيف هذين"])
 
             # Prepend mention in the question:
-            question = f"{mention} - {goal_title}"
-
+            question = f"{goal_title}"
+            await bot.send_message(
+                chat_id=-1002782644259,
+                message_thread_id=thread_id,
+                text=f"{mention} - تفضل بتسجيل تقدمك لليوم مشكورًا 👇",
+                parse_mode="HTML"
+            )
             sent_poll = await bot.send_poll(
                 chat_id=-1002782644259,  # Your group chat ID
                 message_thread_id=thread_id,
