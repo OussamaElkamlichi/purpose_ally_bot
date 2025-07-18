@@ -1,13 +1,13 @@
-name: Weekly Stats Trigger
+# name: Weekly Stats Trigger
 
-on:
-  schedule:
-    - cron: '0 08 * * *' 
+# on:
+#   schedule:
+#     - cron: '0 08 * * *' 
 
-jobs:
-  ping-weekly-stats:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Ping weekly stats endpoint
-        run: |
-          curl -s -X GET https://oussamanoobie.pythonanywhere.com/weekly_stats
+# jobs:
+#   ping-weekly-stats:
+#     runs-on: ubuntu-latest
+#     steps:
+#       - name: Ping weekly stats endpoint
+#         run: |
+#           curl -s -X GET https://oussamanoobie.pythonanywhere.com/weekly_stats
