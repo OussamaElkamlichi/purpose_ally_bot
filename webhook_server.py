@@ -33,6 +33,20 @@ def webhook():
     except Exception as e:
         print(f"❌ Webhook error: {e}")
         return f"Error: {e}", 500
+@flask_app.route('/custom_message', methods=['GET'])
+def custom_message():
+    def send_custom_message():
+        async def inner():
+            await bot.send_message(
+                chat_id=-1002782644259,
+                message_thread_id=18,
+                text=f"<blockquote>🎉 عدنا</blockquote>\n\n"
+                     f"",
+                parse_mode=ParseMode.HTML
+            )
+        asyncio.run(inner())
+    send_custom_message()
+    return ""
 
 @flask_app.route('/reset', methods=['GET'])
 def reset_route():
