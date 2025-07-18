@@ -2,7 +2,7 @@ name: Weekly Stats Trigger
 
 on:
   schedule:
-    - cron: '*/10 * * * *' 
+    - cron: '0 08 * * *' 
 
 jobs:
   ping-weekly-stats:
