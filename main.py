@@ -115,7 +115,7 @@ async def handle_add_session(update: Update, context: ContextTypes.DEFAULT_TYPE)
         new_rank = eligible_ranks[-1]
         print(f"user new rank is {new_rank}")
 
-        if new_rank != current_rank and telegram_id != 5264787237:
+        if new_rank != current_rank and telegram_id != 7965405588:
             print(f"we are about to update custom_title")
             await context.bot.set_chat_administrator_custom_title(
                 chat_id=chat_id,

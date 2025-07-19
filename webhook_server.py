@@ -33,6 +33,7 @@ def webhook():
     except Exception as e:
         print(f"❌ Webhook error: {e}")
         return f"Error: {e}", 500
+    
 @flask_app.route('/custom_message', methods=['GET'])
 def custom_message():
     def send_custom_message():
@@ -59,15 +60,12 @@ def reset_route():
 @flask_app.route('/send_polls', methods=['GET'])
 def fetch_and_prepare_goals():
     try:
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            task = loop.create_task(_async_send_polls_for_all_users())
-        else:
-            loop.run_until_complete(_async_send_polls_for_all_users())
-        return jsonify({"status": "success", "message": "✅ Polls sent to all users"})
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(_async_send_polls_for_all_users())
+        return jsonify({"status": "success", "message": "✅ stats sent to all users"})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
-
 async def _async_send_polls_for_all_users():
     session = Session()
     try:
@@ -189,11 +187,9 @@ async def send_poll(bot, user_id, thread_id, my_list, session, mention):
 @flask_app.route('/weekly_stats', methods=['GET'])
 def fetch_and_prepare_stats():
     try:
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            task = loop.create_task(_async_send_stats_for_all_users())
-        else:
-            loop.run_until_complete(_async_send_stats_for_all_users())
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(_async_send_stats_for_all_users())
         return jsonify({"status": "success", "message": "✅ stats sent to all users"})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
@@ -203,7 +199,7 @@ async def _async_send_stats_for_all_users():
     try:
         users = session.query(User).all()
         for user in users:
-            await send_stats(user.telegram_id)
+            await send_stats(user.telegram_id, user.name)
     finally:
         session.close()
 
@@ -213,7 +209,7 @@ def progress_bar(percentage, length=20):
     return "█" * completed + "░" * (length - completed) + f" {percentage:.1f}%"
 
 
-async def send_stats(user_id):
+async def send_stats(user_id, name):
     try:
         # Fetch data from the database
         total_goals, total_assigned_subgoals, completed_subgoals, completed_sessions, total_sessions = await fetch_weekly_data(user_id)
@@ -221,19 +217,19 @@ async def send_stats(user_id):
         # Calculate progress percentages (handle division by zero)
         goal_progress = (completed_subgoals / total_assigned_subgoals * 100) if total_assigned_subgoals > 0 else 0
         session_progress = (completed_sessions / total_sessions * 100) if total_sessions > 0 else 0
-
-        # Generate the report message
+        mention = f'<a href="tg://user?id={user_id}">{name}</a>'
         report_message = (
-            "📊 *تقرير التقدم الأسبوعي* 📊\n\n"
-            f"🏆 *الأهداف الرئيسية:* {total_goals} هدف\n"
-            f"🎯 *الأهداف الفرعية المكتملة:* {completed_subgoals} هدف فرعي\n"
-            f"🕒 *الجلسات اليومية المكتملة:* {completed_sessions}/{total_sessions}\n\n"
-            "🚀 *تقدم الأهداف:*\n"
+            f"📊 <b>تقرير التقدم الأسبوعي الخاص بـ{mention}</b> 📊\n\n"
+            f"🏆 <b>الأهداف الرئيسية:</b> {total_goals} هدف\n"
+            f"🎯 <b>الأهداف الفرعية المكتملة:</b> {completed_subgoals} هدف فرعي\n"
+            f"🕒 <b>الجلسات اليومية المكتملة:</b> {completed_sessions}/{total_sessions}\n\n"
+            "🚀 <b>تقدم الأهداف:</b>\n"
             f"{progress_bar(goal_progress)}\n\n"
-            "📅 *تقدم الجلسات اليومية:*\n"
+            "📅 <b>تقدم الجلسات اليومية:</b>\n"
             f"{progress_bar(session_progress)}\n\n"
-            "✅ *استمر في العمل الجيد!* 💪"
-        )
+            "✅ <b>استمر في العمل الجيد!</b> 💪"
+        )   
+
 
         # Send the report message
         await bot.send_message(chat_id=-1002782644259, message_thread_id=18,  text=report_message, parse_mode="Markdown")
