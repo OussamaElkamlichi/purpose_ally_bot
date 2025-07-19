@@ -131,7 +131,7 @@ async def send_poll(bot, user_id, thread_id, my_list, session, mention):
     if not my_list:
         await bot.send_message(
             chat_id=user_id,
-            message_thread_id=thread_id,
+            message_thread_id=18,
             text=f"<blockquote>🎉 بارك الله! لقد أنجزت جميع أهدافك!</blockquote>\n\n"
                  f"<b>{mention} هل تريد أن توقف التنبيهات اليومية؟</b>",
             parse_mode=ParseMode.HTML
@@ -153,7 +153,7 @@ async def send_poll(bot, user_id, thread_id, my_list, session, mention):
             if not sent_intro:
                 await bot.send_message(
                     chat_id=-1002782644259,
-                    message_thread_id=thread_id,
+                    message_thread_id=18,
                     text=f"{mention} - تفضل بتسجيل تقدمك لليوم مشكورًا 👇",
                     parse_mode="HTML"
                 )
@@ -163,7 +163,7 @@ async def send_poll(bot, user_id, thread_id, my_list, session, mention):
             question = f"{goal_title}"
             sent_poll = await bot.send_poll(
                 chat_id=-1002782644259,
-                message_thread_id=thread_id,
+                message_thread_id=18,
                 question=question,
                 options=options,
                 is_anonymous=False,
@@ -232,7 +232,7 @@ async def send_stats(user_id, name):
 
 
         # Send the report message
-        await bot.send_message(chat_id=-1002782644259, message_thread_id=18,  text=report_message, parse_mode="Markdown")
+        await bot.send_message(chat_id=-1002782644259, message_thread_id=18,  text=report_message, parse_mode="HTML")
     except Exception as e:
         print(f"Error in weekly_cron: {e}")
 
