@@ -65,7 +65,7 @@ def fetch_and_prepare_goals():
         loop.run_until_complete(_async_send_polls_for_all_users())
         return jsonify({"status": "success", "message": "✅ stats sent to all users"})
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return jsonify({"status": "X__X", "message": str(e)}), 500
 async def _async_send_polls_for_all_users():
     session = Session()
     try:

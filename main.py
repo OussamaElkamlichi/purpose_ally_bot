@@ -117,6 +117,25 @@ async def handle_add_session(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
         if new_rank != current_rank and telegram_id != 7965405588:
             print(f"we are about to update custom_title")
+            await context.bot.promote_chat_member(
+                chat_id=chat_id,
+                user_id=telegram_id,
+                is_anonymous=False,
+                can_manage_chat=True,  # MUST be True for titles
+                can_delete_messages=False,
+                can_manage_video_chats=False,
+                can_restrict_members=False,
+                can_promote_members=False,
+                can_change_info=False,
+                can_invite_users=True,  # Recommended
+                can_post_messages=False,
+                can_edit_messages=False,
+                can_pin_messages=False,
+                can_post_stories=False,
+                can_edit_stories=False,
+                can_delete_stories=False,
+            )
+            
             await context.bot.set_chat_administrator_custom_title(
                 chat_id=chat_id,
                 user_id=telegram_id,
