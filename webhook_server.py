@@ -1,3 +1,5 @@
+
+import logging
 from flask import Flask, request, jsonify
 from main import application
 import asyncio
@@ -8,13 +10,17 @@ from telegram import Update, Bot
 from telegram.constants import ParseMode
 from db_agent import reset
 
-# Define your Telegram bot token here
-TOKEN = ""
 
 flask_app = Flask(__name__)
 bot = application.bot
 Session = sessionmaker(bind=engine)
-session = Session()
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s %(levelname)s %(name)s %(threadName)s : %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 @flask_app.route('/webhook/', methods=['POST'])
 def webhook():
@@ -31,7 +37,7 @@ def webhook():
 
         return "ok"
     except Exception as e:
-        print(f"❌ Webhook error: {e}")
+        logger.error(f"❌ Webhook error: {e}")
         return f"Error: {e}", 500
     
 @flask_app.route('/custom_message', methods=['GET'])
@@ -48,6 +54,7 @@ def custom_message():
         )
 
     asyncio.run(inner())
+    logger.info("✅ formal-funny reply sent (reply_to=642)")
     return jsonify({"status": "✅ formal-funny reply sent", "reply_to": 642})
 
 
@@ -55,8 +62,10 @@ def custom_message():
 def reset_route():
     try:
         reset()
+        logger.info("today_prod_hours reset to 0 for all users")
         return jsonify({"status": "success", "message": "today_prod_hours reset to 0 for all users"}), 200
     except Exception as e:
+        logger.error(f"Reset error: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
 @flask_app.route('/send_polls', methods=['GET'])
@@ -65,24 +74,23 @@ def fetch_and_prepare_goals():
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         loop.run_until_complete(_async_send_polls_for_all_users())
+        logger.info("✅ stats sent to all users")
         return jsonify({"status": "success", "message": "✅ stats sent to all users"})
     except Exception as e:
+        logger.error(f"Send polls error: {e}")
         return jsonify({"status": "X__X", "message": str(e)}), 500
 async def _async_send_polls_for_all_users():
     session = Session()
     try:
-        # Fetch all users (adjust model/field names accordingly)
         users = session.query(User).all()
-
         for user in users:
             user_id = user.telegram_id
-            # Prepare goals data per user
             my_list = await _fetch_user_goals(session, user_id)
             username = getattr(user, "username", None)
             mention = f'<a href="tg://user?id={user_id}">{user.name}</a>'
-
             await send_poll(bot, user_id, 18, my_list, session, mention)
-
+    except Exception as e:
+        logger.error(f"Error in _async_send_polls_for_all_users: {e}")
     finally:
         session.close()
 
@@ -124,20 +132,20 @@ async def _fetch_user_goals(session, user_id):
         session.commit()
     except Exception as e:
         session.rollback()
-        print(f"❌ Error fetching goals for user {user_id}: {e}")
+        logger.error(f"❌ Error fetching goals for user {user_id}: {e}")
 
     return my_list
 
 
 async def send_poll(bot, user_id, thread_id, my_list, session, mention):
     if not my_list:
-        await bot.send_message(
-            chat_id=user_id,
-            message_thread_id=18,
-            text=f"<blockquote>🎉 بارك الله! لقد أنجزت جميع أهدافك!</blockquote>\n\n"
-                 f"<b>{mention} هل تريد أن توقف التنبيهات اليومية؟</b>",
-            parse_mode=ParseMode.HTML
-        )
+        # await bot.send_message(
+        #     chat_id=-1002782644259,
+        #     message_thread_id=18,
+        #     text=f"<blockquote>🎉 بارك الله! لقد أنجزت جميع أهدافك!</blockquote>\n\n"
+        #          f"<b>{mention} هل تريد أن توقف التنبيهات اليومية؟</b>",
+        #     parse_mode=ParseMode.HTML
+        # )
         return
 
     try:
@@ -184,16 +192,19 @@ async def send_poll(bot, user_id, thread_id, my_list, session, mention):
 
     except Exception as e:
         session.rollback()
-        print(f"❌ Failed to send poll for user {user_id}, goal '{goal_title}': {e}")
+        logger.error(f"❌ Failed to send poll for user {user_id}, goal '{goal_title}': {e}")
 
 @flask_app.route('/weekly_stats', methods=['GET'])
 def fetch_and_prepare_stats():
     try:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        loop.run_until_complete(_async_send_stats_for_all_users())
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            asyncio.ensure_future(_async_send_stats_for_all_users())
+        else:
+            loop.run_until_complete(_async_send_stats_for_all_users())
         return jsonify({"status": "success", "message": "✅ stats sent to all users"})
     except Exception as e:
+        logger.error(f"Weekly stats error: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
 async def _async_send_stats_for_all_users():
@@ -202,6 +213,8 @@ async def _async_send_stats_for_all_users():
         users = session.query(User).all()
         for user in users:
             await send_stats(user.telegram_id, user.name)
+    except Exception as e:
+        logger.error(f"Error in _async_send_stats_for_all_users: {e}")
     finally:
         session.close()
 
@@ -236,7 +249,7 @@ async def send_stats(user_id, name):
         # Send the report message
         await bot.send_message(chat_id=-1002782644259, message_thread_id=18,  text=report_message, parse_mode="HTML")
     except Exception as e:
-        print(f"Error in weekly_cron: {e}")
+        logger.error(f"Error in weekly_cron: {e}")
 
 async def fetch_weekly_data(user_id):
     session = Session()
@@ -268,7 +281,7 @@ async def fetch_weekly_data(user_id):
         return total_goals, total_assigned_subgoals, completed_subgoals, completed_sessions, total_sessions
 
     except Exception as e:
-        print(f"Database error: {e}")
+        logger.error(f"Database error: {e}")
         return 0, 0, 0, 0, 0
 
     finally:
