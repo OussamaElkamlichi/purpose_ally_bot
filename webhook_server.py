@@ -12,7 +12,7 @@ from db_agent import reset
 
 
 flask_app = Flask(__name__)
-# asyncio.get_event_loop().run_until_complete(application.initialize())
+asyncio.get_event_loop().run_until_complete(application.initialize())
 # bot = application.bot
 Session = sessionmaker(bind=engine)
 
