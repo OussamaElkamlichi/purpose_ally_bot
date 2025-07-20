@@ -12,6 +12,7 @@ from db_agent import reset
 
 
 flask_app = Flask(__name__)
+asyncio.get_event_loop().run_until_complete(application.initialize())
 bot = application.bot
 Session = sessionmaker(bind=engine)
 
@@ -25,16 +26,19 @@ logger = logging.getLogger(__name__)
 @flask_app.route('/webhook/', methods=['POST'])
 def webhook():
     try:
+        # data = request.get_json(force=True)
+        # update = Update.de_json(data, application.bot)
+
+        # async def handle():
+        #     await application.initialize()
+        #     await application.process_update(update)
+        #     await application.shutdown()  # 🧼 important for flushing outgoing messages
+
+        # asyncio.run(handle())
         data = request.get_json(force=True)
         update = Update.de_json(data, application.bot)
-
-        async def handle():
-            await application.initialize()
-            await application.process_update(update)
-            await application.shutdown()  # 🧼 important for flushing outgoing messages
-
-        asyncio.run(handle())
-
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(application.process_update(update))
         return "ok"
     except Exception as e:
         logger.error(f"❌ Webhook error: {e}")
@@ -48,7 +52,7 @@ def custom_message():
             message_thread_id=18,
             reply_to_message_id=644,
             text=(
-                "سيتم إرجاع رتبتك في الحال\n\n"
+                    "قل هو من عند أنفسكم"
             ),
             parse_mode=ParseMode.HTML
         )
