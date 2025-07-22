@@ -26,19 +26,19 @@ logger = logging.getLogger(__name__)
 @flask_app.route('/webhook/', methods=['POST'])
 def webhook():
     try:
-        # data = request.get_json(force=True)
-        # update = Update.de_json(data, application.bot)
-
-        # async def handle():
-        #     await application.initialize()
-        #     await application.process_update(update)
-        #     await application.shutdown()  # 🧼 important for flushing outgoing messages
-
-        # asyncio.run(handle())
         data = request.get_json(force=True)
         update = Update.de_json(data, application.bot)
-        loop = asyncio.get_event_loop()
-        loop.run_until_complete(application.process_update(update))
+
+        async def handle():
+            await application.initialize()
+            await application.process_update(update)
+            await application.shutdown()  # 🧼 important for flushing outgoing messages
+
+        asyncio.run(handle())
+        # data = request.get_json(force=True)
+        # update = Update.de_json(data, application.bot)
+        # loop = asyncio.get_event_loop()
+        # loop.run_until_complete(application.process_update(update))
         return "ok"
     except Exception as e:
         logger.error(f"❌ Webhook error: {e}")
