@@ -11,7 +11,7 @@ from telegram.ext import (
     PollAnswerHandler,
     filters
 )
-from db_agent import add_user, get_daily_goals_check, get_goals,user_check, get_user_by_telegram_id, get_user_stats_message, add_session, delete_session, get_user_prod_hours, update_user_rank, show_demo_db, edit_prep, updateGoal, cron_seed, destroy_user, mark_as_done
+from db_agent import add_user, get_daily_goals_check, get_goals,user_check, get_user_by_telegram_id, get_user_stats_message, add_session, delete_session, get_user_prod_hours, update_user_rank, show_demo_db, edit_prep, updateGoal, cron_seed, destroy_goals, mark_as_done
 import asyncio, os, json
 from dotenv import load_dotenv
 from datetime import datetime
@@ -621,16 +621,16 @@ async def new_start(update, context):
     user = update.effective_user
     name = f"{user.first_name or ''} {user.last_name or ''}".strip() or "NoName"
     username=user.username or None
-    res = await asyncio.to_thread(destroy_user,user.id)
+    res = await asyncio.to_thread(destroy_goals,user.id)
 
     if res != 200:
         await update.callback_query.message.reply_text("Failed to reset user data. Please try again later.")
         return  
 
-    result = await asyncio.to_thread(add_user, user.id, username, name, default_rank)
-    if result is None:
-        await update.callback_query.message.reply_text("Failed to initialize user data. Please try again later.")
-        return  
+    # result = await asyncio.to_thread(add_user, user.id, username, name, default_rank)
+    # if result is None:
+    #     await update.callback_query.message.reply_text("Failed to initialize user data. Please try again later.")
+    #     return  
 
     project_name = 'شريك الهمّة'
     keyboard = [
