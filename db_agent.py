@@ -457,17 +457,17 @@ def destroy_goals(user_id):
     session = Session()
     try:
         goals = session.query(Goal).filter_by(user_id=user_id).all()
-        if goals:
-            goal_ids = [goal.goal_id for goal in goals]
-            session.query(Subgoal).filter(Subgoal.goal_id.in_(goal_ids)).delete(synchronize_session=False)
-            session.query(Goal).filter(Goal.goal_id.in_(goal_ids)).delete(synchronize_session=False)
-            session.commit()
-            return 200, "Goals and related subgoals deleted successfully."
-        else:
-            return 404, "No goals found for the user."
+        goal_ids = [goal.goal_id for goal in goals]
+            
+        session.query(Subgoal).filter(Subgoal.goal_id.in_(goal_ids)).delete(synchronize_session=False)
+
+        session.query(Goal).filter(Goal.goal_id.in_(goal_ids)).delete(synchronize_session=False)
+
+        session.commit()
+        return 200
     except Exception as err:
         print("Error:", err)
         session.rollback()
-        return 500, f"An error occurred while deleting goals: {err}"
+        return 500
     finally:
         session.close()
