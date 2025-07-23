@@ -824,6 +824,7 @@ convo_handler = ConversationHandler(
             CallbackQueryHandler(update_goals, pattern="done_"),
             CallbackQueryHandler(show_new_goals, pattern='show_new_goals'),
 
+
         ],
         states={
             MAIN_GOAL: [MessageHandler(filters.TEXT & ~filters.COMMAND, main_goal_req)],
