@@ -47,7 +47,7 @@ def webhook():
 @flask_app.route('/custom_message', methods=['GET'])
 def custom_message():
     async def inner():
-        bot = Bot(token="7947352834:AAH8g1h0ag21fxLxiaVzBhRBj-BHzQB1PFc")
+        bot = Bot(token="7947352834:AAEcZsrBn1BMYOmtN5Q8Xx6mULWNfxoDbsQ")
         await bot.send_message(
             chat_id=-1002782644259,
             message_thread_id=18,
@@ -94,7 +94,7 @@ async def _async_send_polls_for_all_users():
             my_list = await _fetch_user_goals(session, user_id)
             username = getattr(user, "username", None)
             mention = f'<a href="tg://user?id={user_id}">{user.name}</a>'
-            bot = Bot(token="7947352834:AAH8g1h0ag21fxLxiaVzBhRBj-BHzQB1PFc")
+            bot = Bot(token="7947352834:AAEcZsrBn1BMYOmtN5Q8Xx6mULWNfxoDbsQ")
             await send_poll(bot, user_id, 18, my_list, session, mention)
     except Exception as e:
         logger.error(f"Error in _async_send_polls_for_all_users: {e}")
@@ -252,7 +252,7 @@ async def send_stats(user_id, name):
             "✅ <b>استمر في العمل الجيد!</b> 💪"
         )   
 
-        bot = Bot(token="7947352834:AAH8g1h0ag21fxLxiaVzBhRBj-BHzQB1PFc")
+        bot = Bot(token="7947352834:AAEcZsrBn1BMYOmtN5Q8Xx6mULWNfxoDbsQ")
 
         # Send the report message
         await bot.send_message(chat_id=-1002782644259, message_thread_id=18,  text=report_message, parse_mode="HTML")
